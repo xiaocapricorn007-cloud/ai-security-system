@@ -18,9 +18,9 @@ const loginError = document.getElementById("login-error");
 const userDisplayName = document.getElementById("user-display-name");
 const logoutBtn = document.getElementById("logout-btn");
 
-const liveVideo = document.getElementById("live-video");
-const playPromptOverlay = document.getElementById("play-prompt-overlay");
-const btnForcePlay = document.getElementById("btn-force-play");
+const liveAiStream = document.getElementById("live-ai-stream");
+const hudStatsTelemetry = document.getElementById("hud-stats-telemetry");
+const hudDetectionCount = document.getElementById("hud-detection-count");
 const cctvCanvas = document.getElementById("cctv-canvas");
 const ctx = cctvCanvas.getContext("2d");
 const currentCamId = document.getElementById("current-cam-id");
@@ -124,76 +124,34 @@ function initApp() {
   setupCameraSelector();
   setupTimelineScrubbing();
   setupAgent();
-  initHlsStream();
+  startStatsPolling();
   startCctvRenderLoop();
 }
 
-function initHlsStream() {
-  const streamUrl = `${API_BASE}/api/stream/earthcam/live.m3u8`;
-  if (!liveVideo) return;
-
-  liveVideo.muted = true;
-  liveVideo.defaultMuted = true;
-  liveVideo.playsInline = true;
-
-  if (typeof Hls !== "undefined" && Hls.isSupported()) {
-    if (hlsInstance) hlsInstance.destroy();
-    hlsInstance = new Hls({
-      enableWorker: true,
-      lowLatencyMode: true,
-      backBufferLength: 30,
-    });
-    hlsInstance.loadSource(streamUrl);
-    hlsInstance.attachMedia(liveVideo);
-    
-    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-      liveVideo.play().then(() => {
-        if (playPromptOverlay) playPromptOverlay.classList.add("hidden");
-      }).catch((e) => {
-        console.log("Autoplay blocked, showing play prompt:", e);
-        if (playPromptOverlay) playPromptOverlay.classList.remove("hidden");
-      });
-    });
-
-    hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-      console.warn("HLS error:", data.type, data.details);
-      if (data.fatal) {
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            hlsInstance.startLoad();
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            hlsInstance.recoverMediaError();
-            break;
-          default:
-            hlsInstance.destroy();
-            if (playPromptOverlay) playPromptOverlay.classList.remove("hidden");
-            break;
+function startStatsPolling() {
+  async function poll() {
+    try {
+      const res = await fetch(`${API_BASE}/api/stream/live/stats`);
+      if (res.ok) {
+        const stats = await res.json();
+        if (hudStatsTelemetry) {
+          hudStatsTelemetry.textContent = `LATENCY: ${stats.latency_ms}ms • ${stats.fps} FPS (${stats.device})`;
+        }
+        if (hudDetectionCount && stats.counts) {
+          const total = stats.counts.person + stats.counts.vehicle + stats.counts.parcel;
+          hudDetectionCount.textContent = `DETECTED: ${stats.counts.person} HUMANS, ${stats.counts.vehicle} VEHICLES`;
+          if (streamStatusTag) {
+            streamStatusTag.textContent = `REAL-TIME DETECTIONS: ${total}`;
+          }
         }
       }
-    });
-  } else if (liveVideo.canPlayType("application/vnd.apple.mpegurl")) {
-    liveVideo.src = streamUrl;
-    liveVideo.addEventListener("loadedmetadata", () => {
-      liveVideo.play().catch(() => {
-        if (playPromptOverlay) playPromptOverlay.classList.remove("hidden");
-      });
-    });
+    } catch (e) {
+      // server still initializing
+    }
   }
 
-  // Play button click handler
-  if (btnForcePlay) {
-    btnForcePlay.onclick = () => {
-      liveVideo.muted = true;
-      liveVideo.play().then(() => {
-        if (playPromptOverlay) playPromptOverlay.classList.add("hidden");
-      }).catch(err => console.error("Force play error:", err));
-    };
-  }
-
-  liveVideo.addEventListener("playing", () => {
-    if (playPromptOverlay) playPromptOverlay.classList.add("hidden");
-  });
+  setInterval(poll, 1500);
+  poll();
 }
 
 function startClock() {
@@ -216,22 +174,24 @@ function setupCameraSelector() {
       if (currentCamera === "cam-01-times-square") {
         currentCamId.textContent = "CAM-01";
         currentCamTitle.textContent = "Times Square South & Broadway";
-        streamStatusTag.textContent = "PEDESTRIAN DENSITY: HIGH";
-        hudFeedSource.textContent = "EARTHCAM 4K • TIMES SQUARE NYC";
-        if (liveVideo) liveVideo.style.display = "block";
-        initHlsStream();
+        streamStatusTag.textContent = "YOLO LIVE DETECTION: ACTIVE";
+        hudFeedSource.textContent = "TIMES SQUARE • YOLOv8 REAL-TIME (RTX 3050)";
+        if (liveAiStream) liveAiStream.classList.remove("hidden");
+        if (cctvCanvas) cctvCanvas.classList.add("hidden");
       } else if (currentCamera === "cam-02-airspace") {
         currentCamId.textContent = "CAM-02";
         currentCamTitle.textContent = "Perimeter North & Airspace";
         streamStatusTag.textContent = "AERIAL RADAR: SCANNING";
         hudFeedSource.textContent = "PERIMETER SENSOR • AIRSPACE NORTH";
-        if (liveVideo) liveVideo.style.display = "none";
+        if (liveAiStream) liveAiStream.classList.add("hidden");
+        if (cctvCanvas) cctvCanvas.classList.remove("hidden");
       } else {
         currentCamId.textContent = "CAM-03";
         currentCamTitle.textContent = "Driveway & Main Gate";
         streamStatusTag.textContent = "VEHICLE RECOGNITION: ACTIVE";
         hudFeedSource.textContent = "BARRIER CAM • GATE SENSOR";
-        if (liveVideo) liveVideo.style.display = "none";
+        if (liveAiStream) liveAiStream.classList.add("hidden");
+        if (cctvCanvas) cctvCanvas.classList.remove("hidden");
       }
       renderIncidentsTable();
     });

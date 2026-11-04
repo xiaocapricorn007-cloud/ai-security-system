@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -20,6 +20,8 @@ from backend.auth import (
 )
 from backend.reasoning_agent import SecurityReasoningAgent
 from backend.earthcam_proxy import router as earthcam_router
+from backend.live_detector import live_detector
+import time
 
 app = FastAPI(
     title="SENTINEL AI Security System",
@@ -63,6 +65,38 @@ class QueryRequest(BaseModel):
 def on_startup():
     init_db()
     seed_admin_user()
+    # Start Real-Time YOLO Detection Pipeline on GPU
+    live_detector.start()
+
+
+# Live Detection MJPEG Stream
+@app.get("/api/stream/live/detected.mjpg")
+def stream_live_detection():
+    """Streams real-time YOLO-annotated frames computed directly on GPU."""
+    def frame_generator():
+        while True:
+            frame_bytes = live_detector.get_latest_jpeg()
+            if frame_bytes:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+                )
+            time.sleep(0.02)
+
+    return StreamingResponse(
+        frame_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+@app.get("/api/stream/live/stats")
+def get_live_stats():
+    """Returns live detection counts and latency from the GPU engine."""
+    return live_detector.get_stats()
 
 
 # Auth Endpoints

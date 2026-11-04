@@ -101,37 +101,25 @@
 
           <!-- Video Canvas / Live EarthCam Stream -->
           <div class="video-wrapper" id="video-wrapper">
-            <!-- Native HTML5 Video Playing Direct EarthCam Stream -->
-            <video id="live-video" class="live-stream-player" autoplay muted playsinline></video>
+            <!-- Real-Time GPU-Annotated YOLO Live Stream (Direct Sub-50ms MJPEG) -->
+            <img 
+              id="live-ai-stream" 
+              class="live-stream-player" 
+              src="/api/stream/live/detected.mjpg" 
+              alt="Real-Time YOLO Surveillance Stream" 
+            />
 
-            <!-- Optional Direct EarthCam Embed Fallback (Hidden by default) -->
-            <iframe
-              id="earthcam-direct-frame"
-              class="live-stream-player hidden"
-              src="https://www.earthcam.com/cams/newyork/timessquare/?cam=tsrobo1"
-              title="EarthCam Direct Portal"
-              frameborder="0"
-              allow="autoplay; fullscreen"
-            ></iframe>
-
-            <!-- Click to Play / Unmute Prompt -->
-            <div id="play-prompt-overlay" class="play-prompt-overlay hidden">
-              <button id="btn-force-play" class="btn-primary" style="width: auto; padding: 10px 20px;">
-                <span>&#9658; Start Times Square Live Stream</span>
-              </button>
-            </div>
-
-            <!-- Transparent AI HUD & Bounding Box Overlay Canvas -->
-            <canvas id="cctv-canvas" width="960" height="540"></canvas>
+            <!-- Transparent AI HUD Overlay Canvas for secondary channels -->
+            <canvas id="cctv-canvas" width="960" height="540" class="hidden"></canvas>
             
             <div class="cctv-overlay">
               <div class="cctv-hud-top">
-                <span id="hud-feed-source">EARTHCAM 4K &bull; TIMES SQUARE NYC</span>
+                <span id="hud-feed-source">TIMES SQUARE &bull; YOLOv8 REAL-TIME (RTX 3050)</span>
                 <span id="hud-cam-time">02:00:22 PM</span>
               </div>
               <div class="cctv-hud-bottom">
-                <span>BITRATE: 5.4 Mbps &bull; 60 FPS</span>
-                <span>AI TRACKING: YOLOv8 CUDA (ACTIVE)</span>
+                <span id="hud-stats-telemetry">LATENCY: 21.9ms &bull; 46 FPS</span>
+                <span id="hud-detection-count">LIVE DETECTIONS: ACTIVE</span>
               </div>
             </div>
           </div>
