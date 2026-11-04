@@ -213,7 +213,7 @@ class UltraLowLatencyEdgeAIDetector:
                     self.frame_ready_event.set()
 
                 # Low-delay grab pacing
-                time.sleep(0.010)
+                time.sleep(0.002)
 
             cap.release()
             print(f"[Ingestion] OFFLOADED {active_id}. Network socket released.")
@@ -432,6 +432,15 @@ class UltraLowLatencyEdgeAIDetector:
 
     def get_stats(self) -> Dict:
         channel_info = CHANNELS.get(self.current_channel_id, CHANNELS["cam-01-times-square"])
+        detections = []
+        for t in self.active_tracks:
+            x1, y1, x2, y2 = t.get_coords()
+            detections.append({
+                "bbox": [x1, y1, x2, y2],
+                "class": t.cls_name.lower(),
+                "conf": round(t.conf, 2),
+            })
+
         return {
             "fps": round(self.current_fps, 1),
             "latency_ms": round(self.latency_ms, 1),
@@ -439,7 +448,9 @@ class UltraLowLatencyEdgeAIDetector:
             "active_channel": self.current_channel_id,
             "channel_name": channel_info["name"],
             "location": channel_info["location"],
+            "earthcam_key": channel_info.get("earthcam_key", "tsrobo1"),
             "counts": self.counts,
+            "detections": detections,
             "timestamp": datetime.datetime.now().isoformat(),
         }
 

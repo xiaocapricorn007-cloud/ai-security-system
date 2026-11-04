@@ -105,6 +105,12 @@ def get_live_stats():
     return live_detector.get_stats()
 
 
+@app.get("/api/stream/live/tracks")
+def get_live_tracks():
+    """Returns real-time detection bounding boxes and telemetry for NVDEC canvas overlays."""
+    return live_detector.get_stats()
+
+
 # Auth Endpoints
 @app.post("/api/auth/login")
 def login(creds: LoginRequest):

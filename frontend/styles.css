@@ -413,6 +413,19 @@ body {
   color: var(--text-muted);
 }
 
+.badge-interactive {
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.badge-interactive:hover {
+  background: var(--text-obsidian);
+  color: #fff;
+  border-color: var(--text-obsidian);
+}
+
 .badge-orange {
   background: var(--accent-orange-light);
   color: var(--accent-orange);

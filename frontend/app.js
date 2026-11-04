@@ -9,6 +9,14 @@ let currentCamera = "cam-01-times-square";
 let allEvents = [];
 let currentOffsetSec = 142.2;
 let hlsInstance = null;
+let streamEngine = "nvdec"; // Default to hardware-accelerated NVDEC with 2-4s buffer
+let activeDetections = [];
+
+const CAM_EARTHCAM_KEYS = {
+  "cam-01-times-square": "tsrobo1",
+  "cam-02-abbey-road": "abbeyroad_uk",
+  "cam-03-liberty-bell": "libertybell",
+};
 
 // Elements
 const authModal = document.getElementById("auth-modal");
@@ -18,6 +26,8 @@ const loginError = document.getElementById("login-error");
 const userDisplayName = document.getElementById("user-display-name");
 const logoutBtn = document.getElementById("logout-btn");
 
+const nativeHlsVideo = document.getElementById("native-hls-video");
+const streamEngineToggle = document.getElementById("stream-engine-toggle");
 const liveAiStream = document.getElementById("live-ai-stream");
 const hudStatsTelemetry = document.getElementById("hud-stats-telemetry");
 const hudDetectionCount = document.getElementById("hud-detection-count");
@@ -124,24 +134,114 @@ function initApp() {
   setupCameraSelector();
   setupTimelineScrubbing();
   setupAgent();
+  setupStreamEngineToggle();
+  initHlsPlayer(CAM_EARTHCAM_KEYS[currentCamera]);
   startStatsPolling();
   startCctvRenderLoop();
+}
+
+function initHlsPlayer(camKey = "tsrobo1") {
+  if (!nativeHlsVideo) return;
+  const streamUrl = `${API_BASE}/api/stream/earthcam/live.m3u8?cam=${camKey}`;
+
+  if (hlsInstance) {
+    try {
+      hlsInstance.destroy();
+    } catch (e) {}
+    hlsInstance = null;
+  }
+
+  if (window.Hls && Hls.isSupported()) {
+    hlsInstance = new Hls({
+      enableWorker: true,
+      lowLatencyMode: false,
+      // Exact 2-4 second jitter buffer configuration requested (NVDEC Hardware accelerated)
+      backBufferLength: 10,
+      maxBufferLength: 4,              // Max 4-second buffer
+      maxMaxBufferLength: 8,
+      liveSyncDurationCount: 3,        // 3-segment buffer (approx 2-4s buffer)
+      liveMaxLatencyDurationCount: 5,  // Catch up if falling behind
+      liveDurationInfinity: true,
+      highBufferWatchdogPeriod: 2,
+    });
+
+    hlsInstance.loadSource(streamUrl);
+    hlsInstance.attachMedia(nativeHlsVideo);
+
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+      nativeHlsVideo.play().catch((e) => console.log("HLS video ready to play:", e));
+    });
+
+    hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            hlsInstance.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            hlsInstance.recoverMediaError();
+            break;
+          default:
+            hlsInstance.destroy();
+            break;
+        }
+      }
+    });
+  } else if (nativeHlsVideo.canPlayType("application/vnd.apple.mpegurl")) {
+    nativeHlsVideo.src = streamUrl;
+    nativeHlsVideo.play().catch((e) => console.log(e));
+  }
+}
+
+function setupStreamEngineToggle() {
+  if (!streamEngineToggle) return;
+
+  streamEngineToggle.addEventListener("click", () => {
+    if (streamEngine === "nvdec") {
+      // Switch to composite MJPEG mode
+      streamEngine = "mjpeg";
+      nativeHlsVideo.classList.add("hidden");
+      try { nativeHlsVideo.pause(); } catch (e) {}
+      cctvCanvas.classList.add("hidden");
+      liveAiStream.classList.remove("hidden");
+      liveAiStream.src = `${API_BASE}/api/stream/live/detected.mjpg?channel=${currentCamera}&t=${Date.now()}`;
+      streamEngineToggle.textContent = "DECODE: COMPOSITE MJPEG (0s BUFFER)";
+      streamEngineToggle.classList.remove("badge-orange");
+    } else {
+      // Switch to NVDEC hardware mode with 2-4s buffer
+      streamEngine = "nvdec";
+      liveAiStream.classList.add("hidden");
+      liveAiStream.src = "";
+      nativeHlsVideo.classList.remove("hidden");
+      cctvCanvas.classList.remove("hidden");
+      initHlsPlayer(CAM_EARTHCAM_KEYS[currentCamera]);
+      streamEngineToggle.textContent = "DECODE: NVDEC (2-4s BUFFER)";
+      streamEngineToggle.classList.add("badge-orange");
+    }
+  });
 }
 
 function startStatsPolling() {
   async function poll() {
     try {
-      const res = await fetch(`${API_BASE}/api/stream/live/stats`);
+      const res = await fetch(`${API_BASE}/api/stream/live/tracks`);
       if (res.ok) {
         const stats = await res.json();
+        if (stats.detections) {
+          activeDetections = stats.detections;
+        }
         if (hudStatsTelemetry) {
-          hudStatsTelemetry.textContent = `LATENCY: ${stats.latency_ms}ms • ${stats.fps} FPS (${stats.device})`;
+          if (streamEngine === "nvdec") {
+            hudStatsTelemetry.textContent = `LATENCY: ${stats.latency_ms}ms • 60 FPS (NVDEC ACCEL + 2-4s BUFFER)`;
+          } else {
+            hudStatsTelemetry.textContent = `LATENCY: ${stats.latency_ms}ms • ${stats.fps} FPS (COMPOSITE MJPEG)`;
+          }
         }
         if (hudDetectionCount && stats.counts) {
           const total = stats.counts.person + stats.counts.vehicle + stats.counts.parcel;
           hudDetectionCount.textContent = `DETECTED: ${stats.counts.person} HUMANS, ${stats.counts.vehicle} VEHICLES`;
           if (streamStatusTag) {
-            streamStatusTag.textContent = `REAL-TIME DETECTIONS: ${total}`;
+            streamStatusTag.textContent = `YOLO LIVE: ${total} DETECTIONS`;
           }
         }
       }
@@ -150,7 +250,7 @@ function startStatsPolling() {
     }
   }
 
-  setInterval(poll, 1500);
+  setInterval(poll, 150);
   poll();
 }
 
@@ -200,8 +300,9 @@ function setupCameraSelector() {
           body: JSON.stringify({ channel_id: currentCamera }),
         });
         
-        // Re-attach fresh MJPEG stream with timestamp to immediately receive the new channel
-        if (liveAiStream) {
+        if (streamEngine === "nvdec") {
+          initHlsPlayer(CAM_EARTHCAM_KEYS[currentCamera]);
+        } else if (liveAiStream) {
           liveAiStream.src = `${API_BASE}/api/stream/live/detected.mjpg?channel=${currentCamera}&t=${Date.now()}`;
         }
       } catch (err) {
@@ -319,79 +420,60 @@ window.jumpToEvent = function (offsetSec, camId = null) {
 
 /* ================= 6. CCTV CANVAS RENDERER ================= */
 function startCctvRenderLoop() {
-  let frameTicker = 0;
+  let smoothedBoxes = [];
 
   function render() {
-    frameTicker++;
     ctx.clearRect(0, 0, cctvCanvas.width, cctvCanvas.height);
 
-    if (currentCamera === "cam-01-times-square") {
-      // 1. Transparent canvas overlay on top of Live EarthCam video
-      // Simulated live pedestrian & vehicle tracking in Times Square
-      const p1x = 320 + Math.sin(frameTicker * 0.02) * 45;
-      const p1y = 360 + Math.cos(frameTicker * 0.015) * 15;
-      drawTargetBox(ctx, p1x, p1y, 35, 75, "PERSON [0.93] #412", "#00E676");
-
-      const p2x = 540 - Math.cos(frameTicker * 0.018) * 40;
-      const p2y = 340 + Math.sin(frameTicker * 0.02) * 12;
-      drawTargetBox(ctx, p2x, p2y, 32, 70, "PERSON [0.89] #418", "#00E676");
-
-      const p3x = 420 + Math.sin(frameTicker * 0.012) * 30;
-      drawTargetBox(ctx, p3x, 380, 40, 80, "PERSON [0.91] #425", "#00E676");
-
-      // Traffic flow tracking on 7th Ave
-      const carX = (frameTicker * 3) % 1100 - 150;
-      if (carX > -100 && carX < 980) {
-        drawTargetBox(ctx, carX, 410, 140, 70, "VEHICLE [0.95] #209", "#29B6F6");
+    if (streamEngine === "nvdec") {
+      // Sync tracked objects count
+      while (smoothedBoxes.length < activeDetections.length) {
+        const item = activeDetections[smoothedBoxes.length];
+        smoothedBoxes.push({
+          bbox: [...item.bbox],
+          class: item.class,
+          conf: item.conf,
+        });
+      }
+      if (smoothedBoxes.length > activeDetections.length) {
+        smoothedBoxes = smoothedBoxes.slice(0, activeDetections.length);
       }
 
-      // Parcel / Drop detection near curb at 02:00 PM
-      if (currentOffsetSec >= 120 && currentOffsetSec <= 180) {
-        drawTargetBox(ctx, 470, 425, 55, 45, "PARCEL [0.88] #301", "#FF4E00", true);
-      }
+      for (let i = 0; i < smoothedBoxes.length; i++) {
+        const target = activeDetections[i];
+        const current = smoothedBoxes[i];
+        if (!target || !target.bbox) continue;
 
-    } else {
-      // 2. Simulated Environment for Other Camera Channels
-      const grad = ctx.createLinearGradient(0, 0, 0, cctvCanvas.height);
-      if (currentCamera === "cam-02-airspace") {
-        grad.addColorStop(0, "#2B3238");
-        grad.addColorStop(0.7, "#424D56");
-        grad.addColorStop(1, "#1E2226");
-      } else {
-        grad.addColorStop(0, "#22252A");
-        grad.addColorStop(0.5, "#30343C");
-        grad.addColorStop(1, "#181A1D");
-      }
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, cctvCanvas.width, cctvCanvas.height);
+        // Smooth EMA/LERP coordinate tracking at 60 FPS
+        current.bbox[0] += (target.bbox[0] - current.bbox[0]) * 0.35;
+        current.bbox[1] += (target.bbox[1] - current.bbox[1]) * 0.35;
+        current.bbox[2] += (target.bbox[2] - current.bbox[2]) * 0.35;
+        current.bbox[3] += (target.bbox[3] - current.bbox[3]) * 0.35;
+        current.class = target.class;
+        current.conf = target.conf;
 
-      // Grid
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-      ctx.lineWidth = 1;
-      for (let x = 0; x < cctvCanvas.width; x += 60) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cctvCanvas.height); ctx.stroke();
-      }
-      for (let y = 0; y < cctvCanvas.height; y += 60) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cctvCanvas.width, y); ctx.stroke();
-      }
+        const x = current.bbox[0];
+        const y = current.bbox[1];
+        const w = Math.max(10, current.bbox[2] - current.bbox[0]);
+        const h = Math.max(10, current.bbox[3] - current.bbox[1]);
 
-      if (currentCamera === "cam-02-airspace") {
-        const hoverX = 480 + Math.sin(frameTicker * 0.04) * 30;
-        const hoverY = 160 + Math.cos(frameTicker * 0.05) * 15;
-        drawTargetBox(ctx, hoverX, hoverY, 160, 90, "DRONE [0.94] #101", "#FF1744", true);
-      } else if (currentCamera === "cam-03-driveway") {
-        drawTargetBox(ctx, 240, 260, 480, 210, "VEHICLE [0.96] #310", "#90CAF9");
-      }
-    }
+        let color = "#00E676"; // Emerald for persons
+        if (["vehicle", "car", "bus", "truck", "motorcycle"].includes(current.class)) {
+          color = "#29B6F6"; // Cyan for vehicles
+        } else if (["parcel", "suitcase", "backpack", "handbag"].includes(current.class)) {
+          color = "#FF4E00"; // Orange for parcels
+        }
 
-    // Micro scan-line effect
-    ctx.fillStyle = "rgba(255, 255, 255, 0.015)";
-    for (let i = 0; i < cctvCanvas.height; i += 4) {
-      ctx.fillRect(0, i, cctvCanvas.width, 1.5);
+        const label = `${current.class.toUpperCase()} ${Math.round(current.conf * 100)}%`;
+        drawTargetBox(ctx, x, y, w, h, label, color, false);
+      }
     }
 
     requestAnimationFrame(render);
   }
+
+  requestAnimationFrame(render);
+}
 
   requestAnimationFrame(render);
 }

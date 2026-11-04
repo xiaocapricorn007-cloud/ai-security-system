@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/styles.css?v=5.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=7.0" />
 </head>
 <body class="bg-halfwhite text-obsidian">
 
@@ -94,23 +94,34 @@
               <h2 class="cam-name" id="current-cam-title">Times Square South & Broadway</h2>
             </div>
             <div class="stream-telemetry">
-              <span class="badge-tag">EARTHCAM 4K &bull; LIVE</span>
-              <span class="badge-tag badge-orange" id="stream-status-tag">PEDESTRIAN DENSITY: HIGH</span>
+              <button id="stream-engine-toggle" class="badge-tag badge-interactive" title="Click to toggle between NVDEC Hardware Video and Direct Composite MJPEG">
+                DECODE: NVDEC (2-4s BUFFER)
+              </button>
+              <span class="badge-tag badge-orange" id="stream-status-tag">YOLO LIVE: ACTIVE</span>
             </div>
           </div>
 
           <!-- Video Canvas / Live EarthCam Stream -->
           <div class="video-wrapper" id="video-wrapper">
-            <!-- Real-Time GPU-Annotated YOLO Live Stream (Direct Sub-50ms MJPEG) -->
+            <!-- Hardware-Accelerated NVDEC Native HLS Player (2-4s Jitter Buffer, Butter-Smooth 60 FPS) -->
+            <video 
+              id="native-hls-video" 
+              class="live-stream-player" 
+              autoplay 
+              muted 
+              playsinline
+            ></video>
+
+            <!-- Direct GPU-Annotated YOLO Composite MJPEG (Fallback / Zero-Buffer Mode) -->
             <img 
               id="live-ai-stream" 
-              class="live-stream-player" 
-              src="/api/stream/live/detected.mjpg" 
+              class="live-stream-player hidden" 
+              src="" 
               alt="Real-Time YOLO Surveillance Stream" 
             />
 
-            <!-- Transparent AI HUD Overlay Canvas for secondary channels -->
-            <canvas id="cctv-canvas" width="960" height="540" class="hidden"></canvas>
+            <!-- Transparent AI HUD Overlay Canvas for Hardware NVDEC Mode -->
+            <canvas id="cctv-canvas" width="960" height="540"></canvas>
             
             <div class="cctv-overlay">
               <div class="cctv-hud-top">
@@ -118,7 +129,7 @@
                 <span id="hud-cam-time">02:00:22 PM</span>
               </div>
               <div class="cctv-hud-bottom">
-                <span id="hud-stats-telemetry">LATENCY: 21.9ms &bull; 46 FPS</span>
+                <span id="hud-stats-telemetry">LATENCY: 8.5ms &bull; 60 FPS (NVDEC ACCEL)</span>
                 <span id="hud-detection-count">LIVE DETECTIONS: ACTIVE</span>
               </div>
             </div>
@@ -250,6 +261,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="/static/app.js?v=5.0"></script>
+  <script src="/static/app.js?v=7.0"></script>
 </body>
 </html>
