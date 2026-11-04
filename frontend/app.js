@@ -8,6 +8,7 @@ let authToken = localStorage.getItem("sentinel_jwt") || null;
 let currentCamera = "cam-01-times-square";
 let allEvents = [];
 let currentOffsetSec = 142.2;
+let hlsInstance = null;
 
 // Elements
 const authModal = document.getElementById("auth-modal");
@@ -17,7 +18,7 @@ const loginError = document.getElementById("login-error");
 const userDisplayName = document.getElementById("user-display-name");
 const logoutBtn = document.getElementById("logout-btn");
 
-const liveStreamFrame = document.getElementById("live-stream-frame");
+const liveVideo = document.getElementById("live-video");
 const cctvCanvas = document.getElementById("cctv-canvas");
 const ctx = cctvCanvas.getContext("2d");
 const currentCamId = document.getElementById("current-cam-id");
@@ -121,7 +122,45 @@ function initApp() {
   setupCameraSelector();
   setupTimelineScrubbing();
   setupAgent();
+  initHlsStream();
   startCctvRenderLoop();
+}
+
+function initHlsStream() {
+  const streamUrl = `${API_BASE}/api/stream/earthcam/live.m3u8`;
+  if (typeof Hls !== "undefined" && Hls.isSupported()) {
+    if (hlsInstance) hlsInstance.destroy();
+    hlsInstance = new Hls({
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 30,
+    });
+    hlsInstance.loadSource(streamUrl);
+    hlsInstance.attachMedia(liveVideo);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+      liveVideo.play().catch((e) => console.log("Live stream waiting for interaction:", e));
+    });
+    hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            hlsInstance.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            hlsInstance.recoverMediaError();
+            break;
+          default:
+            hlsInstance.destroy();
+            break;
+        }
+      }
+    });
+  } else if (liveVideo && liveVideo.canPlayType("application/vnd.apple.mpegurl")) {
+    liveVideo.src = streamUrl;
+    liveVideo.addEventListener("loadedmetadata", () => {
+      liveVideo.play().catch(() => {});
+    });
+  }
 }
 
 function startClock() {
@@ -146,19 +185,20 @@ function setupCameraSelector() {
         currentCamTitle.textContent = "Times Square South & Broadway";
         streamStatusTag.textContent = "PEDESTRIAN DENSITY: HIGH";
         hudFeedSource.textContent = "EARTHCAM 4K • TIMES SQUARE NYC";
-        if (liveStreamFrame) liveStreamFrame.style.display = "block";
+        if (liveVideo) liveVideo.style.display = "block";
+        initHlsStream();
       } else if (currentCamera === "cam-02-airspace") {
         currentCamId.textContent = "CAM-02";
         currentCamTitle.textContent = "Perimeter North & Airspace";
         streamStatusTag.textContent = "AERIAL RADAR: SCANNING";
         hudFeedSource.textContent = "PERIMETER SENSOR • AIRSPACE NORTH";
-        if (liveStreamFrame) liveStreamFrame.style.display = "none";
+        if (liveVideo) liveVideo.style.display = "none";
       } else {
         currentCamId.textContent = "CAM-03";
         currentCamTitle.textContent = "Driveway & Main Gate";
         streamStatusTag.textContent = "VEHICLE RECOGNITION: ACTIVE";
         hudFeedSource.textContent = "BARRIER CAM • GATE SENSOR";
-        if (liveStreamFrame) liveStreamFrame.style.display = "none";
+        if (liveVideo) liveVideo.style.display = "none";
       }
       renderIncidentsTable();
     });

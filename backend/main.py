@@ -19,6 +19,7 @@ from backend.auth import (
     seed_admin_user,
 )
 from backend.reasoning_agent import SecurityReasoningAgent
+from backend.earthcam_proxy import router as earthcam_router
 
 app = FastAPI(
     title="SENTINEL AI Security System",
@@ -34,6 +35,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include EarthCam Live Stream Proxy
+app.include_router(earthcam_router)
 
 # Base Paths
 BASE_DIR = Path("C:/Users/ragha/ai-security-system")
