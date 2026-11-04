@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/stream/earthcam", tags=["EarthCam Live Stream"])
 CAM_PAGES = {
     "tsrobo1": "https://www.earthcam.com/cams/newyork/timessquare/?cam=tsrobo1",
     "abbeyroad_uk": "https://www.earthcam.com/world/england/london/abbeyroad/?cam=abbeyroad_uk",
+    "libertybell": "https://www.earthcam.com/usa/pennsylvania/philadelphia/independencehall/?cam=libertybell",
 }
 
 HEADERS = {

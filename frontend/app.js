@@ -184,9 +184,9 @@ function setupCameraSelector() {
         hudFeedSource.textContent = "ABBEY ROAD CROSSING // LONDON (RTX 3050)";
       } else {
         currentCamId.textContent = "CAM-03";
-        currentCamTitle.textContent = "Salem West Corridor (Tamil Nadu, India)";
+        currentCamTitle.textContent = "The Liberty Bell & Independence Hall (Philadelphia)";
         streamStatusTag.textContent = "YOLO LIVE: ACTIVE";
-        hudFeedSource.textContent = "SALEM WEST // TAMIL NADU (RTX 3050)";
+        hudFeedSource.textContent = "LIBERTY BELL // PHILADELPHIA (RTX 3050)";
       }
 
       // Notify Backend to Offload Old Channel & Onload New Channel

@@ -87,7 +87,7 @@ def stream_live_detection():
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
                 )
-            time.sleep(0.015)
+            time.sleep(0.005)
 
     return StreamingResponse(
         frame_generator(),
@@ -155,13 +155,13 @@ def get_cameras(current_user: dict = Depends(get_current_user)):
                 "stream_provider": "EarthCam / Abbey Road Studios",
             },
             {
-                "id": "cam-03-salem-west",
-                "name": "Salem West Corridor (NH-44)",
-                "location": "Tamil Nadu, India",
+                "id": "cam-03-liberty-bell",
+                "name": "The Liberty Bell & Independence Hall",
+                "location": "Philadelphia, USA",
                 "status": "ONLINE",
                 "fps": 30,
-                "active_detections": ["motorcycle", "vehicle", "person"],
-                "stream_provider": "Tamil Nadu Traffic CCTV",
+                "active_detections": ["person", "tourist", "parcel"],
+                "stream_provider": "EarthCam / National Park Service",
             },
         ]
     }

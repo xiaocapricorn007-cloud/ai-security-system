@@ -131,17 +131,17 @@ def seed_demo_data(cursor, conn):
             {
                 "timestamp": f"{base_today}T14:15:30",
                 "time_display": "02:15:30 PM",
-                "camera_id": "cam-03-salem-west",
-                "camera_name": "Salem West Corridor (Tamil Nadu)",
-                "object_class": "vehicle",
-                "confidence": 0.96,
+                "camera_id": "cam-03-liberty-bell",
+                "camera_name": "Liberty Bell & Independence Hall (Philadelphia)",
+                "object_class": "person",
+                "confidence": 0.94,
                 "track_id": 310,
-                "bbox_json": json.dumps([110, 340, 520, 580]),
-                "snapshot_path": "snapshots/demo_vehicle.jpg",
+                "bbox_json": json.dumps([110, 340, 320, 580]),
+                "snapshot_path": "snapshots/demo_courier.jpg",
                 "video_offset_sec": 210.5,
                 "is_alert": 0,
-                "alert_title": "Heavy Goods Vehicle Transit",
-                "description": "Commercial transport vehicle passed through Salem West junction corridor."
+                "alert_title": "Visitor Near Liberty Bell Pavilion",
+                "description": "Visitor identified entering Independence Hall historic corridor."
             }
         ]
 
