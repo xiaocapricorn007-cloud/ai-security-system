@@ -4,6 +4,52 @@ A modern, full-stack AI security surveillance system combining real-time compute
 
 ---
 
+## 🚀 Quickstart (Clone & Run in 60 Seconds)
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/xiaocapricorn007-cloud/ai-security-system.git
+cd ai-security-system
+```
+
+### 2. Set Up Python Virtual Environment
+```bash
+python -m venv .venv
+
+# On Windows:
+.venv\Scripts\activate
+
+# On Linux / macOS:
+source .venv/bin/activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+*(Optional for GPU)*: If you have an NVIDIA GPU, install PyTorch with CUDA for sub-25ms inference:
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+```
+*(If no NVIDIA GPU is present, it will automatically run on CPU or In-Browser WebGPU with 0% configuration needed!)*
+
+### 4. Start the Application
+```bash
+python run_server.py
+```
+Or launch the full orchestrated master pipeline:
+```bash
+python start.py
+```
+
+Open your browser to:  
+👉 **http://127.0.0.1:8000**  
+- **Operator Username**: `admin`
+- **Passcode**: `sentinel123` *(Click the "Operator Access" chip on login screen to auto-fill)*
+
+---
+
 ## ⚡ Master Command (One-Click Pipeline Launch)
 
 To start the entire pipeline (Hardware check, SQLite archive, Reasoning Agent, and Web App):

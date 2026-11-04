@@ -12,6 +12,7 @@ __pycache__/
 # PyTorch & Large Model Weights (>100MB exceeds GitHub limit)
 *.pt
 *.onnx
+!frontend/models/yolov8n.onnx
 *.engine
 *.pth
 yolov8*.pt

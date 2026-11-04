@@ -9,6 +9,7 @@ pyyaml>=6.0.0
 requests>=2.31.0
 tqdm>=4.66.0
 matplotlib>=3.8.0
+onnx>=1.15.0
 
 # Future Phases (Agent & Backend API)
 fastapi>=0.115.0
