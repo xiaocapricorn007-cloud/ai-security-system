@@ -67,7 +67,9 @@ async function checkAuth() {
 
     if (res.ok) {
       const data = await res.json();
-      userDisplayName.textContent = data.user.full_name || data.user.username;
+      if (userDisplayName && data.user) {
+        userDisplayName.textContent = data.user.full_name || data.user.username;
+      }
       hideAuthModal();
       initApp();
     } else {
@@ -79,21 +81,23 @@ async function checkAuth() {
 }
 
 function showAuthModal() {
-  authModal.classList.remove("hidden");
-  appContainer.classList.add("hidden");
+  if (authModal) authModal.classList.remove("hidden");
+  if (appContainer) appContainer.classList.add("hidden");
 }
 
 function hideAuthModal() {
-  authModal.classList.add("hidden");
-  appContainer.classList.remove("hidden");
+  if (authModal) authModal.classList.add("hidden");
+  if (appContainer) appContainer.classList.remove("hidden");
 }
 
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  loginError.classList.add("hidden");
+  if (loginError) loginError.classList.add("hidden");
 
-  const username = document.getElementById("login-username").value.trim();
-  const password = document.getElementById("login-password").value.trim();
+  const usernameInput = document.getElementById("login-username");
+  const passwordInput = document.getElementById("login-password");
+  const username = usernameInput ? usernameInput.value.trim() : "admin";
+  const password = passwordInput ? passwordInput.value.trim() : "sentinel123";
 
   try {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
@@ -106,16 +110,22 @@ loginForm.addEventListener("submit", async (e) => {
       const data = await res.json();
       authToken = data.access_token;
       localStorage.setItem("sentinel_jwt", authToken);
-      userDisplayName.textContent = data.user.full_name;
+      if (userDisplayName && data.user) {
+        userDisplayName.textContent = data.user.full_name || data.user.username;
+      }
       hideAuthModal();
       initApp();
     } else {
-      loginError.textContent = "Invalid credentials. Try admin / sentinel123";
-      loginError.classList.remove("hidden");
+      if (loginError) {
+        loginError.textContent = "Invalid credentials. Try admin / sentinel123";
+        loginError.classList.remove("hidden");
+      }
     }
   } catch (err) {
-    loginError.textContent = "Server unreachable. Ensure FastAPI backend is running.";
-    loginError.classList.remove("hidden");
+    if (loginError) {
+      loginError.textContent = "Server unreachable. Ensure FastAPI backend is running.";
+      loginError.classList.remove("hidden");
+    }
   }
 });
 
@@ -129,15 +139,15 @@ logoutBtn.addEventListener("click", logout);
 
 /* ================= 2. INITIALIZATION ================= */
 function initApp() {
-  startClock();
-  fetchEvents();
-  setupCameraSelector();
-  setupTimelineScrubbing();
-  setupAgent();
-  setupStreamEngineToggle();
-  initHlsPlayer(CAM_EARTHCAM_KEYS[currentCamera]);
-  startStatsPolling();
-  startCctvRenderLoop();
+  try { startClock(); } catch (e) { console.error("startClock error:", e); }
+  try { fetchEvents(); } catch (e) { console.error("fetchEvents error:", e); }
+  try { setupCameraSelector(); } catch (e) { console.error("setupCameraSelector error:", e); }
+  try { setupTimelineScrubbing(); } catch (e) { console.error("setupTimelineScrubbing error:", e); }
+  try { setupAgent(); } catch (e) { console.error("setupAgent error:", e); }
+  try { setupStreamEngineToggle(); } catch (e) { console.error("setupStreamEngineToggle error:", e); }
+  try { initHlsPlayer(CAM_EARTHCAM_KEYS[currentCamera]); } catch (e) { console.error("initHlsPlayer error:", e); }
+  try { startStatsPolling(); } catch (e) { console.error("startStatsPolling error:", e); }
+  try { startCctvRenderLoop(); } catch (e) { console.error("startCctvRenderLoop error:", e); }
 }
 
 function initHlsPlayer(camKey = "tsrobo1") {
@@ -190,6 +200,20 @@ function initHlsPlayer(camKey = "tsrobo1") {
   } else if (nativeHlsVideo.canPlayType("application/vnd.apple.mpegurl")) {
     nativeHlsVideo.src = streamUrl;
     nativeHlsVideo.play().catch((e) => console.log(e));
+  } else {
+    // Graceful fallback to composite MJPEG stream if Hls.js not available
+    console.warn("HLS.js not detected; falling back to composite stream.");
+    streamEngine = "mjpeg";
+    if (nativeHlsVideo) nativeHlsVideo.classList.add("hidden");
+    if (cctvCanvas) cctvCanvas.classList.add("hidden");
+    if (liveAiStream) {
+      liveAiStream.classList.remove("hidden");
+      liveAiStream.src = `${API_BASE}/api/stream/live/detected.mjpg?channel=${currentCamera}&t=${Date.now()}`;
+    }
+    if (streamEngineToggle) {
+      streamEngineToggle.textContent = "DECODE: COMPOSITE MJPEG (0s BUFFER)";
+      streamEngineToggle.classList.remove("badge-orange");
+    }
   }
 }
 
@@ -471,9 +495,6 @@ function startCctvRenderLoop() {
 
     requestAnimationFrame(render);
   }
-
-  requestAnimationFrame(render);
-}
 
   requestAnimationFrame(render);
 }
