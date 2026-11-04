@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=3.0" />
 </head>
 <body class="bg-halfwhite text-obsidian">
 
@@ -100,9 +100,26 @@
           </div>
 
           <!-- Video Canvas / Live EarthCam Stream -->
-          <div class="video-wrapper">
+          <div class="video-wrapper" id="video-wrapper">
             <!-- Native HTML5 Video Playing Direct EarthCam Stream -->
             <video id="live-video" class="live-stream-player" autoplay muted playsinline></video>
+
+            <!-- Optional Direct EarthCam Embed Fallback (Hidden by default) -->
+            <iframe
+              id="earthcam-direct-frame"
+              class="live-stream-player hidden"
+              src="https://www.earthcam.com/cams/newyork/timessquare/?cam=tsrobo1"
+              title="EarthCam Direct Portal"
+              frameborder="0"
+              allow="autoplay; fullscreen"
+            ></iframe>
+
+            <!-- Click to Play / Unmute Prompt -->
+            <div id="play-prompt-overlay" class="play-prompt-overlay hidden">
+              <button id="btn-force-play" class="btn-primary" style="width: auto; padding: 10px 20px;">
+                <span>&#9658; Start Times Square Live Stream</span>
+              </button>
+            </div>
 
             <!-- Transparent AI HUD & Bounding Box Overlay Canvas -->
             <canvas id="cctv-canvas" width="960" height="540"></canvas>
@@ -245,6 +262,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=3.0"></script>
 </body>
 </html>

@@ -1,13 +1,13 @@
 """
-EarthCam Live Stream Proxy Engine
+EarthCam Live Stream Proxy Engine (High Fidelity Base64 Router)
 Proxies the live Times Square HLS (.m3u8 / .ts) stream directly from EarthCam's servers
-to the Sentinel surveillance console, bypassing cross-origin and iframe restrictions.
+without query parameter token corruption or cross-origin blocks.
 """
 
+import base64
 import json
 import re
 import time
-import urllib.parse
 from typing import Optional
 import requests
 from fastapi import APIRouter, HTTPException, Query, Response
@@ -29,10 +29,18 @@ _cache = {
 }
 
 
+def b64_encode(s: str) -> str:
+    return base64.urlsafe_b64encode(s.encode("utf-8")).decode("utf-8")
+
+
+def b64_decode(s: str) -> str:
+    return base64.urlsafe_b64decode(s.encode("utf-8")).decode("utf-8")
+
+
 def fetch_fresh_stream_url() -> tuple:
     """Extracts the active tokenized m3u8 stream from EarthCam's HTML config."""
     now = time.time()
-    if _cache["stream_url"] and (now - _cache["last_fetched"]) < 60:
+    if _cache["stream_url"] and (now - _cache["last_fetched"]) < 50:
         return _cache["stream_url"], _cache["base_url"]
 
     try:
@@ -42,8 +50,9 @@ def fetch_fresh_stream_url() -> tuple:
             raise ValueError("json_base variable not found in EarthCam page")
 
         data = json.loads(match.group(1))
-        cam_info = data.get("cam", {}).get("tsrobo1", {})
-        stream_url = cam_info.get("stream")
+        # Prefer tsrobo1 or tsnorth4k
+        cam_info = data.get("cam", {}).get("tsrobo1", {}) or data.get("cam", {}).get("tsnorth4k", {})
+        stream_url = cam_info.get("stream") or cam_info.get("html5_streampath")
         if not stream_url or "m3u8" not in stream_url:
             raise ValueError(f"No valid m3u8 stream found: {stream_url}")
 
@@ -51,6 +60,7 @@ def fetch_fresh_stream_url() -> tuple:
         _cache["stream_url"] = stream_url
         _cache["base_url"] = base_url
         _cache["last_fetched"] = now
+        print(f"[EarthCam Proxy] Connected to fresh stream: {stream_url[:80]}...")
         return stream_url, base_url
     except Exception as e:
         print(f"[EarthCam Proxy Error] Failed to refresh stream token: {e}")
@@ -76,9 +86,9 @@ def get_master_playlist():
             if line.startswith("#"):
                 rewritten_lines.append(line)
             else:
-                # Relative chunklist
                 full_chunklist_url = line if line.startswith("http") else base_url + line
-                proxy_chunklist = f"/api/stream/earthcam/chunklist.m3u8?url={urllib.parse.quote(full_chunklist_url)}"
+                token_b64 = b64_encode(full_chunklist_url)
+                proxy_chunklist = f"/api/stream/earthcam/chunklist.m3u8?b={token_b64}"
                 rewritten_lines.append(proxy_chunklist)
 
         content = "\n".join(rewritten_lines)
@@ -95,15 +105,21 @@ def get_master_playlist():
 
 
 @router.get("/chunklist.m3u8")
-def get_chunklist(url: str = Query(...)):
+def get_chunklist(b: Optional[str] = None, url: Optional[str] = None):
     """Returns rewritten chunklist pointing .ts video segments to this proxy."""
-    chunklist_url = urllib.parse.unquote(url)
+    if b:
+        chunklist_url = b64_decode(b)
+    elif url:
+        chunklist_url = url
+    else:
+        raise HTTPException(status_code=400, detail="Missing url or b parameter")
+
     base_chunk_url = chunklist_url.split("chunklist")[0]
 
     try:
         r = requests.get(chunklist_url, headers=HEADERS, timeout=6)
         if r.status_code != 200:
-            raise HTTPException(status_code=r.status_code, detail="Failed to fetch chunklist from EarthCam")
+            raise HTTPException(status_code=r.status_code, detail=f"Failed to fetch chunklist (HTTP {r.status_code})")
 
         rewritten_lines = []
         for line in r.text.strip().split("\n"):
@@ -114,7 +130,8 @@ def get_chunklist(url: str = Query(...)):
                 rewritten_lines.append(line)
             else:
                 full_ts_url = line if line.startswith("http") else base_chunk_url + line
-                proxy_ts = f"/api/stream/earthcam/segment.ts?url={urllib.parse.quote(full_ts_url)}"
+                token_b64 = b64_encode(full_ts_url)
+                proxy_ts = f"/api/stream/earthcam/segment.ts?b={token_b64}"
                 rewritten_lines.append(proxy_ts)
 
         content = "\n".join(rewritten_lines)
@@ -131,13 +148,18 @@ def get_chunklist(url: str = Query(...)):
 
 
 @router.get("/segment.ts")
-def get_segment(url: str = Query(...)):
-    """Proxies the MPEG-TS video byte stream."""
-    ts_url = urllib.parse.unquote(url)
+def get_segment(b: Optional[str] = None, url: Optional[str] = None):
+    """Proxies the MPEG-TS video byte stream without token corruption."""
+    if b:
+        ts_url = b64_decode(b)
+    elif url:
+        ts_url = url
+    else:
+        raise HTTPException(status_code=400, detail="Missing url or b parameter")
 
     def iter_stream():
         with requests.get(ts_url, headers=HEADERS, stream=True, timeout=8) as r:
-            for chunk in r.iter_content(chunk_size=16384):
+            for chunk in r.iter_content(chunk_size=32768):
                 if chunk:
                     yield chunk
 

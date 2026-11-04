@@ -441,6 +441,17 @@ body {
   pointer-events: auto;
 }
 
+.play-prompt-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 10;
+}
+
 #cctv-canvas {
   position: absolute;
   inset: 0;

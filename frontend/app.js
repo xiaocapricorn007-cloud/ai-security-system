@@ -19,6 +19,8 @@ const userDisplayName = document.getElementById("user-display-name");
 const logoutBtn = document.getElementById("logout-btn");
 
 const liveVideo = document.getElementById("live-video");
+const playPromptOverlay = document.getElementById("play-prompt-overlay");
+const btnForcePlay = document.getElementById("btn-force-play");
 const cctvCanvas = document.getElementById("cctv-canvas");
 const ctx = cctvCanvas.getContext("2d");
 const currentCamId = document.getElementById("current-cam-id");
@@ -128,6 +130,12 @@ function initApp() {
 
 function initHlsStream() {
   const streamUrl = `${API_BASE}/api/stream/earthcam/live.m3u8`;
+  if (!liveVideo) return;
+
+  liveVideo.muted = true;
+  liveVideo.defaultMuted = true;
+  liveVideo.playsInline = true;
+
   if (typeof Hls !== "undefined" && Hls.isSupported()) {
     if (hlsInstance) hlsInstance.destroy();
     hlsInstance = new Hls({
@@ -137,10 +145,18 @@ function initHlsStream() {
     });
     hlsInstance.loadSource(streamUrl);
     hlsInstance.attachMedia(liveVideo);
+    
     hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-      liveVideo.play().catch((e) => console.log("Live stream waiting for interaction:", e));
+      liveVideo.play().then(() => {
+        if (playPromptOverlay) playPromptOverlay.classList.add("hidden");
+      }).catch((e) => {
+        console.log("Autoplay blocked, showing play prompt:", e);
+        if (playPromptOverlay) playPromptOverlay.classList.remove("hidden");
+      });
     });
+
     hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+      console.warn("HLS error:", data.type, data.details);
       if (data.fatal) {
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
@@ -151,16 +167,33 @@ function initHlsStream() {
             break;
           default:
             hlsInstance.destroy();
+            if (playPromptOverlay) playPromptOverlay.classList.remove("hidden");
             break;
         }
       }
     });
-  } else if (liveVideo && liveVideo.canPlayType("application/vnd.apple.mpegurl")) {
+  } else if (liveVideo.canPlayType("application/vnd.apple.mpegurl")) {
     liveVideo.src = streamUrl;
     liveVideo.addEventListener("loadedmetadata", () => {
-      liveVideo.play().catch(() => {});
+      liveVideo.play().catch(() => {
+        if (playPromptOverlay) playPromptOverlay.classList.remove("hidden");
+      });
     });
   }
+
+  // Play button click handler
+  if (btnForcePlay) {
+    btnForcePlay.onclick = () => {
+      liveVideo.muted = true;
+      liveVideo.play().then(() => {
+        if (playPromptOverlay) playPromptOverlay.classList.add("hidden");
+      }).catch(err => console.error("Force play error:", err));
+    };
+  }
+
+  liveVideo.addEventListener("playing", () => {
+    if (playPromptOverlay) playPromptOverlay.classList.add("hidden");
+  });
 }
 
 function startClock() {
