@@ -1,0 +1,9 @@
+# YOLO Dataset Configuration for Single-Class Human (Person) Detection
+path: C:/Users/ragha/ai-security-system/data/human_dataset
+train: images/train
+val: images/val
+test: images/test
+
+nc: 1
+names:
+  0: person

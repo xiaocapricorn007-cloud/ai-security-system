@@ -1,0 +1,15 @@
+# YOLO Dataset Configuration for AI Security System
+path: C:/Users/ragha/ai-security-system/data
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: 4
+
+# Class names
+names:
+  0: person
+  1: drone
+  2: parcel
+  3: vehicle

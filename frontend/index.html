@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SENTINEL — AI Security Intelligence</title>
+  
+  <!-- Editorial Serif & Modern UI Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="bg-halfwhite text-obsidian">
+
+  <!-- AUTHENTICATION MODAL OVERLAY -->
+  <div id="auth-modal" class="auth-overlay">
+    <div class="auth-card">
+      <div class="brand-monogram">SENTINEL <span class="highlight-orange">//</span> 01</div>
+      <h1 class="auth-title">Surveillance Intelligence</h1>
+      <p class="auth-subtitle">Restricted Security Console. Please identify yourself to decrypt surveillance feeds and query the AI agent.</p>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label>Operator ID / Username</label>
+          <input type="text" id="login-username" value="admin" required autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label>Security Passcode</label>
+          <input type="password" id="login-password" value="sentinel123" required autocomplete="current-password" />
+        </div>
+        <div id="login-error" class="login-error hidden">Invalid credentials. Please re-enter.</div>
+        <button type="submit" class="btn-primary">
+          <span>Authenticate Session</span>
+          <span class="arrow">&rarr;</span>
+        </button>
+      </form>
+      <div class="auth-footer">
+        Default operator credentials: <code>admin</code> / <code>sentinel123</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="app" class="app-layout hidden">
+    
+    <!-- TOP NAVIGATION & STATUS BAR -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <div class="logo">SENTINEL <span class="accent-orange">//</span> 01</div>
+        <div class="status-indicator">
+          <span class="pulse-dot"></span>
+          <span class="status-label">CCTV LIVE</span>
+        </div>
+        <div class="hw-chip">RTX 3050 &bull; 58 FPS &bull; YOLOv8-CUDA</div>
+      </div>
+
+      <div class="nav-center">
+        <!-- Camera Channel Selector -->
+        <div class="channel-pills" id="camera-selector">
+          <button class="channel-pill active" data-cam="cam-01-entrance">
+            <span class="pill-dot"></span> Front Porch
+          </button>
+          <button class="channel-pill" data-cam="cam-02-airspace">
+            <span class="pill-dot"></span> Airspace North
+          </button>
+          <button class="channel-pill" data-cam="cam-03-driveway">
+            <span class="pill-dot"></span> Driveway Gate
+          </button>
+        </div>
+      </div>
+
+      <div class="nav-right">
+        <div class="clock-display" id="system-clock">02:00:22 PM</div>
+        <div class="user-chip">
+          <span class="user-avatar">AD</span>
+          <span class="user-name" id="user-display-name">Admin</span>
+        </div>
+        <button id="logout-btn" class="btn-text">Sign Out</button>
+      </div>
+    </header>
+
+    <!-- MAIN SURVEILLANCE & REASONING SECTION -->
+    <main class="dashboard-grid">
+      
+      <!-- LEFT COLUMN: VIDEO FEED & TIMELINE CONTROLS -->
+      <section class="feed-column">
+        
+        <div class="video-panel">
+          <div class="video-header">
+            <div class="cam-info">
+              <span class="cam-badge" id="current-cam-id">CAM-01</span>
+              <h2 class="cam-name" id="current-cam-title">Front Porch & Entrance</h2>
+            </div>
+            <div class="stream-telemetry">
+              <span class="badge-tag">1080P &bull; 60Hz</span>
+              <span class="badge-tag badge-orange">PARCEL DETECTED</span>
+            </div>
+          </div>
+
+          <!-- Video Canvas / Simulated CCTV Stream -->
+          <div class="video-wrapper">
+            <canvas id="cctv-canvas" width="960" height="540"></canvas>
+            
+            <div class="cctv-overlay">
+              <div class="cctv-hud-top">
+                <span>REC &bull; 2026-11-04</span>
+                <span id="hud-cam-time">02:00:22 PM</span>
+              </div>
+              <div class="cctv-hud-bottom">
+                <span>BITRATE: 4.2 Mbps</span>
+                <span>LATENCY: 12ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scrubbable Video Timeline with Event Markers -->
+          <div class="timeline-container">
+            <div class="timeline-header">
+              <div class="timeline-title">Surveillance Index Timeline</div>
+              <div class="timeline-playback-time" id="playback-time-label">02:00:22 PM (142s)</div>
+            </div>
+
+            <div class="timeline-track" id="timeline-track">
+              <!-- Event Tick Markers dynamically injected -->
+              <div class="timeline-progress" id="timeline-progress" style="width: 60%;"></div>
+              <div class="timeline-scrubber" id="timeline-scrubber" style="left: 60%;"></div>
+              
+              <div class="event-markers" id="event-markers">
+                <!-- Markers: Blue = person, Orange = parcel, Red = drone -->
+              </div>
+            </div>
+
+            <div class="timeline-axis">
+              <span>11:00 AM</span>
+              <span>12:00 PM</span>
+              <span>01:00 PM</span>
+              <span>02:00 PM</span>
+              <span>03:00 PM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RECENT INCIDENT LOGS -->
+        <div class="incidents-panel">
+          <div class="panel-header">
+            <h3 class="editorial-title">Surveillance Incident Log</h3>
+            <div class="filter-tabs">
+              <button class="filter-tab active" data-filter="all">All Events</button>
+              <button class="filter-tab" data-filter="parcel">Parcels</button>
+              <button class="filter-tab" data-filter="drone">Drone Alerts</button>
+              <button class="filter-tab" data-filter="person">Humans</button>
+            </div>
+          </div>
+
+          <div class="incident-table-wrapper">
+            <table class="incident-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Camera</th>
+                  <th>Entity</th>
+                  <th>Confidence</th>
+                  <th>Incident Description</th>
+                  <th>Proof</th>
+                </tr>
+              </thead>
+              <tbody id="incidents-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT COLUMN: AI REASONING ASSISTANT -->
+      <aside class="reasoning-column">
+        <div class="agent-panel">
+          
+          <div class="agent-header">
+            <div class="agent-badge">
+              <span class="sparkle-icon">&#10022;</span> AI Reasoning Agent
+            </div>
+            <h2 class="agent-headline">Footage Analysis & Query</h2>
+            <p class="agent-desc">Ask natural questions. The agent inspects camera footage, verifies object timestamps, and links proof clips.</p>
+          </div>
+
+          <!-- Suggested Quick Queries -->
+          <div class="suggested-queries">
+            <span class="suggest-label">Try asking:</span>
+            <button class="suggest-chip" data-query="Did someone drop a parcel at 2:00 pm?">
+              &ldquo;Did someone drop a parcel at 2:00 pm?&rdquo;
+            </button>
+            <button class="suggest-chip" data-query="Was there any unauthorized drone spotted?">
+              &ldquo;Was there any unauthorized drone spotted?&rdquo;
+            </button>
+            <button class="suggest-chip" data-query="Show me all visitors at the front entrance">
+              &ldquo;Show me all visitors at the front entrance&rdquo;
+            </button>
+          </div>
+
+          <!-- Query Input -->
+          <form id="agent-query-form" class="agent-input-form">
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="agent-query-input" 
+                placeholder="Ask e.g. Did someone drop a parcel at 2:00 pm?..." 
+                required 
+              />
+              <button type="submit" class="btn-ask" id="btn-ask-submit">
+                <span>Analyze</span>
+                <span class="arrow">&rarr;</span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Agent Response Card -->
+          <div class="agent-response-area" id="agent-response-area">
+            
+            <div class="welcome-card" id="welcome-card">
+              <div class="welcome-icon">&#128065;</div>
+              <h4 class="welcome-title">Ready to Reason Across Surveillance</h4>
+              <p>Type a question or click any prompt above to cross-reference multi-object events across time and cameras.</p>
+            </div>
+
+            <!-- Dynamic Answer Card injected here -->
+            <div id="agent-result-card" class="result-card hidden">
+              <!-- Rendered by app.js -->
+            </div>
+
+          </div>
+
+        </div>
+      </aside>
+
+    </main>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
