@@ -71,17 +71,17 @@ def seed_demo_data(cursor, conn):
             {
                 "timestamp": f"{base_today}T11:35:12",
                 "time_display": "11:35:12 AM",
-                "camera_id": "cam-02-airspace",
-                "camera_name": "Perimeter North & Airspace",
-                "object_class": "drone",
-                "confidence": 0.94,
+                "camera_id": "cam-02-abbey-road",
+                "camera_name": "Abbey Road Crossing (London)",
+                "object_class": "person",
+                "confidence": 0.95,
                 "track_id": 101,
-                "bbox_json": json.dumps([210, 85, 340, 195]),
-                "snapshot_path": "snapshots/demo_drone.jpg",
+                "bbox_json": json.dumps([210, 185, 340, 395]),
+                "snapshot_path": "snapshots/demo_courier.jpg",
                 "video_offset_sec": 42.5,
-                "is_alert": 1,
-                "alert_title": "Unauthorized Drone Intrusion",
-                "description": "Quad-rotor drone hovering over restricted perimeter at 35m altitude."
+                "is_alert": 0,
+                "alert_title": "Pedestrians on Zebra Crossing",
+                "description": "Group of 4 tourists identified crossing zebra crossing outside Abbey Road Studios."
             },
             {
                 "timestamp": f"{base_today}T13:45:04",
@@ -131,8 +131,8 @@ def seed_demo_data(cursor, conn):
             {
                 "timestamp": f"{base_today}T14:15:30",
                 "time_display": "02:15:30 PM",
-                "camera_id": "cam-03-driveway",
-                "camera_name": "Driveway & Gate",
+                "camera_id": "cam-03-salem-west",
+                "camera_name": "Salem West Corridor (Tamil Nadu)",
                 "object_class": "vehicle",
                 "confidence": 0.96,
                 "track_id": 310,
@@ -140,8 +140,8 @@ def seed_demo_data(cursor, conn):
                 "snapshot_path": "snapshots/demo_vehicle.jpg",
                 "video_offset_sec": 210.5,
                 "is_alert": 0,
-                "alert_title": "Vehicle Exited Property",
-                "description": "White delivery van departed through main perimeter gate."
+                "alert_title": "Heavy Goods Vehicle Transit",
+                "description": "Commercial transport vehicle passed through Salem West junction corridor."
             }
         ]
 

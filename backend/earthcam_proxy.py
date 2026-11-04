@@ -1,32 +1,32 @@
 """
-EarthCam Live Stream Proxy Engine (High Fidelity Base64 Router)
-Proxies the live Times Square HLS (.m3u8 / .ts) stream directly from EarthCam's servers
-without query parameter token corruption or cross-origin blocks.
+EarthCam Multi-Camera Live Stream Proxy Engine
+Proxies Times Square, Abbey Road London, and regional feeds directly from EarthCam's CDN
+with per-camera caching, lossless Base64 token routing, and zero cross-origin issues.
 """
 
 import base64
 import json
 import re
 import time
-from typing import Optional
+from typing import Dict, Optional, Tuple
 import requests
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/api/stream/earthcam", tags=["EarthCam Live Stream"])
 
-EARTHCAM_PAGE = "https://www.earthcam.com/cams/newyork/timessquare/?cam=tsrobo1"
+CAM_PAGES = {
+    "tsrobo1": "https://www.earthcam.com/cams/newyork/timessquare/?cam=tsrobo1",
+    "abbeyroad_uk": "https://www.earthcam.com/world/england/london/abbeyroad/?cam=abbeyroad_uk",
+}
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Referer": "https://www.earthcam.com/",
     "Origin": "https://www.earthcam.com",
 }
 
-_cache = {
-    "stream_url": None,
-    "base_url": None,
-    "last_fetched": 0,
-}
+_cache: Dict[str, dict] = {}
 
 
 def b64_encode(s: str) -> str:
@@ -37,42 +37,45 @@ def b64_decode(s: str) -> str:
     return base64.urlsafe_b64decode(s.encode("utf-8")).decode("utf-8")
 
 
-def fetch_fresh_stream_url() -> tuple:
-    """Extracts the active tokenized m3u8 stream from EarthCam's HTML config."""
+def fetch_fresh_stream_url(cam_key: str = "tsrobo1") -> Tuple[str, str]:
+    """Extracts active tokenized m3u8 stream for the requested camera from EarthCam."""
     now = time.time()
-    if _cache["stream_url"] and (now - _cache["last_fetched"]) < 50:
-        return _cache["stream_url"], _cache["base_url"]
+    cached = _cache.get(cam_key)
+    if cached and (now - cached["last_fetched"]) < 60:
+        return cached["stream_url"], cached["base_url"]
 
+    page_url = CAM_PAGES.get(cam_key, CAM_PAGES["tsrobo1"])
     try:
-        r = requests.get(EARTHCAM_PAGE, headers=HEADERS, timeout=8)
+        r = requests.get(page_url, headers=HEADERS, timeout=8)
         match = re.search(r"var\s+json_base\s*=\s*(\{.*?\});\s*(?:var|//)", r.text, re.DOTALL)
         if not match:
-            raise ValueError("json_base variable not found in EarthCam page")
+            raise ValueError(f"json_base not found on {page_url}")
 
         data = json.loads(match.group(1))
-        # Prefer tsrobo1 or tsnorth4k
-        cam_info = data.get("cam", {}).get("tsrobo1", {}) or data.get("cam", {}).get("tsnorth4k", {})
+        cam_info = data.get("cam", {}).get(cam_key, {}) or next(iter(data.get("cam", {}).values()))
         stream_url = cam_info.get("stream") or cam_info.get("html5_streampath")
         if not stream_url or "m3u8" not in stream_url:
-            raise ValueError(f"No valid m3u8 stream found: {stream_url}")
+            raise ValueError(f"No valid m3u8 stream found for {cam_key}: {stream_url}")
 
         base_url = stream_url.split("playlist.m3u8")[0]
-        _cache["stream_url"] = stream_url
-        _cache["base_url"] = base_url
-        _cache["last_fetched"] = now
-        print(f"[EarthCam Proxy] Connected to fresh stream: {stream_url[:80]}...")
+        _cache[cam_key] = {
+            "stream_url": stream_url,
+            "base_url": base_url,
+            "last_fetched": now,
+        }
+        print(f"[EarthCam Proxy] Connected to {cam_key}: {stream_url[:75]}...")
         return stream_url, base_url
     except Exception as e:
-        print(f"[EarthCam Proxy Error] Failed to refresh stream token: {e}")
-        if _cache["stream_url"]:
-            return _cache["stream_url"], _cache["base_url"]
-        raise HTTPException(status_code=502, detail=f"Unable to reach EarthCam stream: {e}")
+        print(f"[EarthCam Proxy Error] Failed to refresh {cam_key}: {e}")
+        if cached:
+            return cached["stream_url"], cached["base_url"]
+        raise HTTPException(status_code=502, detail=f"Unable to reach EarthCam stream {cam_key}: {e}")
 
 
 @router.get("/live.m3u8")
-def get_master_playlist():
+def get_master_playlist(cam: str = "tsrobo1"):
     """Returns rewritten master HLS playlist pointing chunklists to this proxy."""
-    stream_url, base_url = fetch_fresh_stream_url()
+    stream_url, base_url = fetch_fresh_stream_url(cam)
     try:
         r = requests.get(stream_url, headers=HEADERS, timeout=6)
         if r.status_code != 200:
@@ -88,7 +91,7 @@ def get_master_playlist():
             else:
                 full_chunklist_url = line if line.startswith("http") else base_url + line
                 token_b64 = b64_encode(full_chunklist_url)
-                proxy_chunklist = f"/api/stream/earthcam/chunklist.m3u8?b={token_b64}"
+                proxy_chunklist = f"/api/stream/earthcam/chunklist.m3u8?b={token_b64}&cam={cam}"
                 rewritten_lines.append(proxy_chunklist)
 
         content = "\n".join(rewritten_lines)
@@ -105,7 +108,7 @@ def get_master_playlist():
 
 
 @router.get("/chunklist.m3u8")
-def get_chunklist(b: Optional[str] = None, url: Optional[str] = None):
+def get_chunklist(b: Optional[str] = None, url: Optional[str] = None, cam: str = "tsrobo1"):
     """Returns rewritten chunklist pointing .ts video segments to this proxy."""
     if b:
         chunklist_url = b64_decode(b)

@@ -60,6 +60,10 @@ class QueryRequest(BaseModel):
     query: str
 
 
+class SwitchChannelRequest(BaseModel):
+    channel_id: str
+
+
 # Startup event
 @app.on_event("startup")
 def on_startup():
@@ -134,34 +138,41 @@ def get_cameras(current_user: dict = Depends(get_current_user)):
         "cameras": [
             {
                 "id": "cam-01-times-square",
-                "name": "Times Square South & Broadway (EarthCam 4K)",
+                "name": "Times Square South & Broadway",
+                "location": "New York, USA",
                 "status": "ONLINE",
-                "fps": 60,
-                "resolution": "3840x2160 (4K)",
+                "fps": 30,
                 "active_detections": ["person", "vehicle", "parcel"],
-                "last_alert": "02:00:22 PM",
-                "stream_provider": "EarthCam Live",
+                "stream_provider": "EarthCam Live 4K",
             },
             {
-                "id": "cam-02-airspace",
-                "name": "Perimeter North & Airspace",
+                "id": "cam-02-abbey-road",
+                "name": "Abbey Road Crossing",
+                "location": "London, England",
                 "status": "ONLINE",
-                "fps": 58,
-                "resolution": "1920x1080",
-                "active_detections": ["drone"],
-                "last_alert": "11:35:12 AM",
+                "fps": 30,
+                "active_detections": ["person", "vehicle"],
+                "stream_provider": "EarthCam / Abbey Road Studios",
             },
             {
-                "id": "cam-03-driveway",
-                "name": "Driveway & Main Gate",
+                "id": "cam-03-salem-west",
+                "name": "Salem West Corridor (NH-44)",
+                "location": "Tamil Nadu, India",
                 "status": "ONLINE",
-                "fps": 58,
-                "resolution": "1920x1080",
-                "active_detections": ["vehicle"],
-                "last_alert": "02:15:30 PM",
+                "fps": 30,
+                "active_detections": ["motorcycle", "vehicle", "person"],
+                "stream_provider": "Tamil Nadu Traffic CCTV",
             },
         ]
     }
+
+
+# Channel Switching Endpoint (Lazy Onloading / Offloading)
+@app.post("/api/stream/channel/switch")
+def switch_channel(body: SwitchChannelRequest):
+    """Offloads the inactive channel and onloads the target channel exclusively."""
+    result = live_detector.switch_channel(body.channel_id)
+    return result
 
 
 # Events API

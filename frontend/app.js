@@ -166,33 +166,48 @@ function startClock() {
 function setupCameraSelector() {
   const pills = document.querySelectorAll(".channel-pill");
   pills.forEach((pill) => {
-    pill.addEventListener("click", () => {
+    pill.addEventListener("click", async () => {
       pills.forEach((p) => p.classList.remove("active"));
       pill.classList.add("active");
       currentCamera = pill.dataset.cam;
 
+      // Update UI Header
       if (currentCamera === "cam-01-times-square") {
         currentCamId.textContent = "CAM-01";
-        currentCamTitle.textContent = "Times Square South & Broadway";
-        streamStatusTag.textContent = "YOLO LIVE DETECTION: ACTIVE";
-        hudFeedSource.textContent = "TIMES SQUARE • YOLOv8 REAL-TIME (RTX 3050)";
-        if (liveAiStream) liveAiStream.classList.remove("hidden");
-        if (cctvCanvas) cctvCanvas.classList.add("hidden");
-      } else if (currentCamera === "cam-02-airspace") {
+        currentCamTitle.textContent = "Times Square South & Broadway (NYC)";
+        streamStatusTag.textContent = "YOLO LIVE: ACTIVE";
+        hudFeedSource.textContent = "TIMES SQUARE // YOLOv8 REAL-TIME (RTX 3050)";
+      } else if (currentCamera === "cam-02-abbey-road") {
         currentCamId.textContent = "CAM-02";
-        currentCamTitle.textContent = "Perimeter North & Airspace";
-        streamStatusTag.textContent = "AERIAL RADAR: SCANNING";
-        hudFeedSource.textContent = "PERIMETER SENSOR • AIRSPACE NORTH";
-        if (liveAiStream) liveAiStream.classList.add("hidden");
-        if (cctvCanvas) cctvCanvas.classList.remove("hidden");
+        currentCamTitle.textContent = "Abbey Road Crossing (London, UK)";
+        streamStatusTag.textContent = "YOLO LIVE: ACTIVE";
+        hudFeedSource.textContent = "ABBEY ROAD CROSSING // LONDON (RTX 3050)";
       } else {
         currentCamId.textContent = "CAM-03";
-        currentCamTitle.textContent = "Driveway & Main Gate";
-        streamStatusTag.textContent = "VEHICLE RECOGNITION: ACTIVE";
-        hudFeedSource.textContent = "BARRIER CAM • GATE SENSOR";
-        if (liveAiStream) liveAiStream.classList.add("hidden");
-        if (cctvCanvas) cctvCanvas.classList.remove("hidden");
+        currentCamTitle.textContent = "Salem West Corridor (Tamil Nadu, India)";
+        streamStatusTag.textContent = "YOLO LIVE: ACTIVE";
+        hudFeedSource.textContent = "SALEM WEST // TAMIL NADU (RTX 3050)";
       }
+
+      // Notify Backend to Offload Old Channel & Onload New Channel
+      try {
+        await fetch(`${API_BASE}/api/stream/channel/switch`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ channel_id: currentCamera }),
+        });
+        
+        // Re-attach fresh MJPEG stream with timestamp to immediately receive the new channel
+        if (liveAiStream) {
+          liveAiStream.src = `${API_BASE}/api/stream/live/detected.mjpg?channel=${currentCamera}&t=${Date.now()}`;
+        }
+      } catch (err) {
+        console.error("Channel switch failed:", err);
+      }
+
       renderIncidentsTable();
     });
   });
