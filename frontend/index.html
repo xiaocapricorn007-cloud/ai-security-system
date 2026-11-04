@@ -59,8 +59,8 @@
       <div class="nav-center">
         <!-- Camera Channel Selector -->
         <div class="channel-pills" id="camera-selector">
-          <button class="channel-pill active" data-cam="cam-01-entrance">
-            <span class="pill-dot"></span> Front Porch
+          <button class="channel-pill active" data-cam="cam-01-times-square">
+            <span class="pill-dot"></span> Times Square (EarthCam)
           </button>
           <button class="channel-pill" data-cam="cam-02-airspace">
             <span class="pill-dot"></span> Airspace North
@@ -91,26 +91,38 @@
           <div class="video-header">
             <div class="cam-info">
               <span class="cam-badge" id="current-cam-id">CAM-01</span>
-              <h2 class="cam-name" id="current-cam-title">Front Porch & Entrance</h2>
+              <h2 class="cam-name" id="current-cam-title">Times Square South & Broadway</h2>
             </div>
             <div class="stream-telemetry">
-              <span class="badge-tag">1080P &bull; 60Hz</span>
-              <span class="badge-tag badge-orange">PARCEL DETECTED</span>
+              <span class="badge-tag">EARTHCAM 4K &bull; LIVE</span>
+              <span class="badge-tag badge-orange" id="stream-status-tag">PEDESTRIAN DENSITY: HIGH</span>
             </div>
           </div>
 
-          <!-- Video Canvas / Simulated CCTV Stream -->
+          <!-- Video Canvas / Live EarthCam Stream -->
           <div class="video-wrapper">
+            <!-- EarthCam Times Square Live Stream Embed -->
+            <iframe
+              id="live-stream-frame"
+              class="live-stream-player"
+              src="https://www.youtube-nocookie.com/embed/AdUw5RdyZxI?autoplay=1&mute=1&controls=0&loop=1&playsinline=1&modestbranding=1&rel=0&enablejsapi=1"
+              title="EarthCam Times Square 4K Live CCTV"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen
+            ></iframe>
+
+            <!-- Transparent AI HUD & Bounding Box Overlay Canvas -->
             <canvas id="cctv-canvas" width="960" height="540"></canvas>
             
             <div class="cctv-overlay">
               <div class="cctv-hud-top">
-                <span>REC &bull; 2026-11-04</span>
+                <span id="hud-feed-source">EARTHCAM 4K &bull; TIMES SQUARE NYC</span>
                 <span id="hud-cam-time">02:00:22 PM</span>
               </div>
               <div class="cctv-hud-bottom">
-                <span>BITRATE: 4.2 Mbps</span>
-                <span>LATENCY: 12ms</span>
+                <span>BITRATE: 5.4 Mbps &bull; 60 FPS</span>
+                <span>AI TRACKING: YOLOv8 CUDA (ACTIVE)</span>
               </div>
             </div>
           </div>

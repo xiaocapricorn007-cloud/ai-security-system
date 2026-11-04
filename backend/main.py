@@ -93,13 +93,14 @@ def get_cameras(current_user: dict = Depends(get_current_user)):
     return {
         "cameras": [
             {
-                "id": "cam-01-entrance",
-                "name": "Front Porch & Entrance",
+                "id": "cam-01-times-square",
+                "name": "Times Square South & Broadway (EarthCam 4K)",
                 "status": "ONLINE",
-                "fps": 58,
-                "resolution": "1920x1080",
-                "active_detections": ["person", "parcel"],
+                "fps": 60,
+                "resolution": "3840x2160 (4K)",
+                "active_detections": ["person", "vehicle", "parcel"],
                 "last_alert": "02:00:22 PM",
+                "stream_provider": "EarthCam Live",
             },
             {
                 "id": "cam-02-airspace",

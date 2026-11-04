@@ -424,16 +424,30 @@ body {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #111;
+  background: #0A0A0A;
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+}
+
+.live-stream-player {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 #cctv-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .cctv-overlay {
@@ -444,10 +458,11 @@ body {
   flex-direction: column;
   justify-content: space-between;
   pointer-events: none;
+  z-index: 3;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 .cctv-hud-top, .cctv-hud-bottom {

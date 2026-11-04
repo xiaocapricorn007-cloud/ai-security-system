@@ -86,8 +86,8 @@ def seed_demo_data(cursor, conn):
             {
                 "timestamp": f"{base_today}T13:45:04",
                 "time_display": "01:45:04 PM",
-                "camera_id": "cam-01-entrance",
-                "camera_name": "Front Porch & Entrance",
+                "camera_id": "cam-01-times-square",
+                "camera_name": "Times Square South & Broadway",
                 "object_class": "person",
                 "confidence": 0.91,
                 "track_id": 204,
@@ -95,14 +95,14 @@ def seed_demo_data(cursor, conn):
                 "snapshot_path": "snapshots/demo_courier.jpg",
                 "video_offset_sec": 120.0,
                 "is_alert": 0,
-                "alert_title": "Courier Approaching Doorstep",
-                "description": "Delivery courier in uniform approached the front porch carrying a carton box."
+                "alert_title": "Pedestrian in Crosswalk",
+                "description": "Pedestrian in dark jacket detected crossing pedestrian plaza."
             },
             {
                 "timestamp": f"{base_today}T14:00:22",
                 "time_display": "02:00:22 PM",
-                "camera_id": "cam-01-entrance",
-                "camera_name": "Front Porch & Entrance",
+                "camera_id": "cam-01-times-square",
+                "camera_name": "Times Square South & Broadway",
                 "object_class": "parcel",
                 "confidence": 0.88,
                 "track_id": 205,
@@ -110,14 +110,14 @@ def seed_demo_data(cursor, conn):
                 "snapshot_path": "snapshots/demo_parcel.jpg",
                 "video_offset_sec": 142.2,
                 "is_alert": 1,
-                "alert_title": "Parcel Deposited at Porch",
-                "description": "Medium cardboard package left in front of main entrance by courier."
+                "alert_title": "Unattended Parcel Deposited",
+                "description": "Unattended parcel left near curb of 7th Avenue pedestrian walkway."
             },
             {
                 "timestamp": f"{base_today}T14:01:05",
                 "time_display": "02:01:05 PM",
-                "camera_id": "cam-01-entrance",
-                "camera_name": "Front Porch & Entrance",
+                "camera_id": "cam-01-times-square",
+                "camera_name": "Times Square South & Broadway",
                 "object_class": "person",
                 "confidence": 0.89,
                 "track_id": 204,
@@ -125,8 +125,8 @@ def seed_demo_data(cursor, conn):
                 "snapshot_path": "snapshots/demo_courier_leave.jpg",
                 "video_offset_sec": 165.0,
                 "is_alert": 0,
-                "alert_title": "Courier Departed",
-                "description": "Courier walking away down the driveway toward delivery van."
+                "alert_title": "Pedestrian Departed",
+                "description": "Individual moved north along Broadway towards 47th St."
             },
             {
                 "timestamp": f"{base_today}T14:15:30",

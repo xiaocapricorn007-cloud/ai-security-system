@@ -5,9 +5,9 @@
 
 const API_BASE = window.location.origin;
 let authToken = localStorage.getItem("sentinel_jwt") || null;
-let currentCamera = "cam-01-entrance";
+let currentCamera = "cam-01-times-square";
 let allEvents = [];
-let currentOffsetSec = 142.2; // Default to parcel event time for immediate visual delight
+let currentOffsetSec = 142.2;
 
 // Elements
 const authModal = document.getElementById("auth-modal");
@@ -17,10 +17,13 @@ const loginError = document.getElementById("login-error");
 const userDisplayName = document.getElementById("user-display-name");
 const logoutBtn = document.getElementById("logout-btn");
 
+const liveStreamFrame = document.getElementById("live-stream-frame");
 const cctvCanvas = document.getElementById("cctv-canvas");
 const ctx = cctvCanvas.getContext("2d");
 const currentCamId = document.getElementById("current-cam-id");
 const currentCamTitle = document.getElementById("current-cam-title");
+const streamStatusTag = document.getElementById("stream-status-tag");
+const hudFeedSource = document.getElementById("hud-feed-source");
 const hudCamTime = document.getElementById("hud-cam-time");
 const playbackTimeLabel = document.getElementById("playback-time-label");
 const systemClock = document.getElementById("system-clock");
@@ -138,15 +141,24 @@ function setupCameraSelector() {
       pill.classList.add("active");
       currentCamera = pill.dataset.cam;
 
-      if (currentCamera === "cam-01-entrance") {
+      if (currentCamera === "cam-01-times-square") {
         currentCamId.textContent = "CAM-01";
-        currentCamTitle.textContent = "Front Porch & Entrance";
+        currentCamTitle.textContent = "Times Square South & Broadway";
+        streamStatusTag.textContent = "PEDESTRIAN DENSITY: HIGH";
+        hudFeedSource.textContent = "EARTHCAM 4K • TIMES SQUARE NYC";
+        if (liveStreamFrame) liveStreamFrame.style.display = "block";
       } else if (currentCamera === "cam-02-airspace") {
         currentCamId.textContent = "CAM-02";
         currentCamTitle.textContent = "Perimeter North & Airspace";
+        streamStatusTag.textContent = "AERIAL RADAR: SCANNING";
+        hudFeedSource.textContent = "PERIMETER SENSOR • AIRSPACE NORTH";
+        if (liveStreamFrame) liveStreamFrame.style.display = "none";
       } else {
         currentCamId.textContent = "CAM-03";
         currentCamTitle.textContent = "Driveway & Main Gate";
+        streamStatusTag.textContent = "VEHICLE RECOGNITION: ACTIVE";
+        hudFeedSource.textContent = "BARRIER CAM • GATE SENSOR";
+        if (liveStreamFrame) liveStreamFrame.style.display = "none";
       }
       renderIncidentsTable();
     });
@@ -265,65 +277,66 @@ function startCctvRenderLoop() {
     frameTicker++;
     ctx.clearRect(0, 0, cctvCanvas.width, cctvCanvas.height);
 
-    // 1. Draw Simulated Camera Environment Background
-    const grad = ctx.createLinearGradient(0, 0, 0, cctvCanvas.height);
-    if (currentCamera === "cam-02-airspace") {
-      // Sky view
-      grad.addColorStop(0, "#2B3238");
-      grad.addColorStop(0.7, "#424D56");
-      grad.addColorStop(1, "#1E2226");
-    } else if (currentCamera === "cam-03-driveway") {
-      // Asphalt & Gate
-      grad.addColorStop(0, "#22252A");
-      grad.addColorStop(0.5, "#30343C");
-      grad.addColorStop(1, "#181A1D");
-    } else {
-      // Front porch
-      grad.addColorStop(0, "#1F2327");
-      grad.addColorStop(0.4, "#2E343B");
-      grad.addColorStop(1, "#14171A");
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, cctvCanvas.width, cctvCanvas.height);
+    if (currentCamera === "cam-01-times-square") {
+      // 1. Transparent canvas overlay on top of Live EarthCam video
+      // Simulated live pedestrian & vehicle tracking in Times Square
+      const p1x = 320 + Math.sin(frameTicker * 0.02) * 45;
+      const p1y = 360 + Math.cos(frameTicker * 0.015) * 15;
+      drawTargetBox(ctx, p1x, p1y, 35, 75, "PERSON [0.93] #412", "#00E676");
 
-    // Architectural grid lines
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-    ctx.lineWidth = 1;
-    for (let x = 0; x < cctvCanvas.width; x += 60) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, cctvCanvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < cctvCanvas.height; y += 60) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(cctvCanvas.width, y);
-      ctx.stroke();
-    }
+      const p2x = 540 - Math.cos(frameTicker * 0.018) * 40;
+      const p2y = 340 + Math.sin(frameTicker * 0.02) * 12;
+      drawTargetBox(ctx, p2x, p2y, 32, 70, "PERSON [0.89] #418", "#00E676");
 
-    // 2. Draw Simulated Bounding Boxes based on active camera and timeline
-    if (currentCamera === "cam-01-entrance") {
-      // Porch / Courier / Parcel
-      // Static Parcel at doorstep
-      drawTargetBox(ctx, 420, 360, 140, 100, "PARCEL [0.88]", "#FF4E00", true);
+      const p3x = 420 + Math.sin(frameTicker * 0.012) * 30;
+      drawTargetBox(ctx, p3x, 380, 40, 80, "PERSON [0.91] #425", "#00E676");
 
-      // Courier moving if offset between 110 and 170
-      if (currentOffsetSec >= 110 && currentOffsetSec <= 180) {
-        const bob = Math.sin(frameTicker * 0.05) * 5;
-        drawTargetBox(ctx, 280, 140 + bob, 120, 310, "PERSON [0.91] #204", "#00E676");
+      // Traffic flow tracking on 7th Ave
+      const carX = (frameTicker * 3) % 1100 - 150;
+      if (carX > -100 && carX < 980) {
+        drawTargetBox(ctx, carX, 410, 140, 70, "VEHICLE [0.95] #209", "#29B6F6");
       }
-    } else if (currentCamera === "cam-02-airspace") {
-      // Drone hovering
-      const hoverX = 480 + Math.sin(frameTicker * 0.04) * 30;
-      const hoverY = 160 + Math.cos(frameTicker * 0.05) * 15;
-      drawTargetBox(ctx, hoverX, hoverY, 160, 90, "DRONE [0.94] #101", "#FF1744", true);
-    } else if (currentCamera === "cam-03-driveway") {
-      // Delivery Van
-      drawTargetBox(ctx, 240, 260, 480, 210, "VEHICLE [0.96] #310", "#90CAF9");
+
+      // Parcel / Drop detection near curb at 02:00 PM
+      if (currentOffsetSec >= 120 && currentOffsetSec <= 180) {
+        drawTargetBox(ctx, 470, 425, 55, 45, "PARCEL [0.88] #301", "#FF4E00", true);
+      }
+
+    } else {
+      // 2. Simulated Environment for Other Camera Channels
+      const grad = ctx.createLinearGradient(0, 0, 0, cctvCanvas.height);
+      if (currentCamera === "cam-02-airspace") {
+        grad.addColorStop(0, "#2B3238");
+        grad.addColorStop(0.7, "#424D56");
+        grad.addColorStop(1, "#1E2226");
+      } else {
+        grad.addColorStop(0, "#22252A");
+        grad.addColorStop(0.5, "#30343C");
+        grad.addColorStop(1, "#181A1D");
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, cctvCanvas.width, cctvCanvas.height);
+
+      // Grid
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < cctvCanvas.width; x += 60) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cctvCanvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < cctvCanvas.height; y += 60) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cctvCanvas.width, y); ctx.stroke();
+      }
+
+      if (currentCamera === "cam-02-airspace") {
+        const hoverX = 480 + Math.sin(frameTicker * 0.04) * 30;
+        const hoverY = 160 + Math.cos(frameTicker * 0.05) * 15;
+        drawTargetBox(ctx, hoverX, hoverY, 160, 90, "DRONE [0.94] #101", "#FF1744", true);
+      } else if (currentCamera === "cam-03-driveway") {
+        drawTargetBox(ctx, 240, 260, 480, 210, "VEHICLE [0.96] #310", "#90CAF9");
+      }
     }
 
-    // 3. Scan-line effect
+    // Micro scan-line effect
     ctx.fillStyle = "rgba(255, 255, 255, 0.015)";
     for (let i = 0; i < cctvCanvas.height; i += 4) {
       ctx.fillRect(0, i, cctvCanvas.width, 1.5);
