@@ -67,6 +67,7 @@ const liveAiStream = document.getElementById("live-ai-stream");
 const cctvCanvas = document.getElementById("cctv-canvas");
 const ctx = cctvCanvas ? cctvCanvas.getContext("2d") : null;
 const streamEngineToggle = document.getElementById("stream-engine-toggle");
+const mlEngineModeToggle = document.getElementById("ml-engine-mode-toggle");
 const streamStatusTag = document.getElementById("stream-status-tag");
 const streamCamId = document.getElementById("stream-cam-id");
 const streamCamTitle = document.getElementById("stream-cam-title");
@@ -75,6 +76,9 @@ const hudStatsTelemetry = document.getElementById("hud-stats-telemetry");
 const hudDetectionCount = document.getElementById("hud-detection-count");
 const hudFeedSource = document.getElementById("hud-feed-source");
 const hudCamTime = document.getElementById("hud-cam-time");
+const topHwChip = document.getElementById("top-hw-chip");
+window.mlInferenceEngine = "server";
+let mlInferenceEngine = "server"; // 'server' | 'webgpu'
 
 // Stream Analytics & Telemetry Elements
 const streamCountPersons = document.getElementById("stream-count-persons");
@@ -84,6 +88,8 @@ const streamActiveTracksList = document.getElementById("stream-active-tracks-lis
 const streamTotalTracksBadge = document.getElementById("stream-total-tracks-badge");
 const streamMetricLatency = document.getElementById("stream-metric-latency");
 const streamMetricFps = document.getElementById("stream-metric-fps");
+const streamMetricPrecision = document.getElementById("stream-metric-precision");
+const streamMetricTracker = document.getElementById("stream-metric-tracker");
 const streamAnalyticsHeading = document.getElementById("stream-analytics-heading");
 
 // Stream Chat Elements (Bottom Right)
@@ -238,6 +244,7 @@ function initApp() {
   fetchCameras();
   fetchEvents();
   setupStreamEngineToggle();
+  setupMlEngineModeToggle();
   setupStreamPills();
   setupLandingChat();
   setupStreamChat();
@@ -369,13 +376,20 @@ async function switchCameraChannel(camId) {
 
   // Clear tracks immediately to prevent visual ghosting
   persistentTracks.clear();
+  if (typeof webgpuEngine !== "undefined") webgpuEngine.resetTracks();
   if (ctx && cctvCanvas) ctx.clearRect(0, 0, cctvCanvas.width, cctvCanvas.height);
 
   // Update Header UI
   if (streamCamId) streamCamId.textContent = CAM_CODES[camId] || "CAM-01";
   if (streamCamTitle) streamCamTitle.textContent = CAM_TITLES[camId] || camId;
   if (streamAnalyticsHeading) streamAnalyticsHeading.textContent = `${CAM_CODES[camId]} Current Detections`;
-  if (hudFeedSource) hudFeedSource.textContent = `${CAM_TITLES[camId].toUpperCase()} // YOLOv8 FP16 (RTX 3050)`;
+  if (hudFeedSource) {
+    if (mlInferenceEngine === "webgpu") {
+      hudFeedSource.textContent = `${(CAM_TITLES[camId] || camId).toUpperCase()} // YOLOv8 CLIENT WEBGPU (IN-BROWSER)`;
+    } else {
+      hudFeedSource.textContent = `${(CAM_TITLES[camId] || camId).toUpperCase()} // YOLOv8 FP16 (RTX 3050)`;
+    }
+  }
 
   // Update Active Pills in Stream Top Bar
   document.querySelectorAll(".stream-pill").forEach((pill) => {
@@ -475,7 +489,7 @@ function setupStreamEngineToggle() {
       cctvCanvas.classList.add("hidden");
       liveAiStream.classList.remove("hidden");
       liveAiStream.src = `${API_BASE}/api/stream/live/detected.mjpg?channel=${currentCamera}&t=${Date.now()}`;
-      streamEngineToggle.textContent = "DECODE: COMPOSITE MJPEG (0s BUFFER)";
+      streamEngineToggle.textContent = "DECODE: MJPEG (0s)";
       streamEngineToggle.classList.remove("badge-orange");
     } else {
       streamEngine = "nvdec";
@@ -484,8 +498,393 @@ function setupStreamEngineToggle() {
       nativeHlsVideo.classList.remove("hidden");
       cctvCanvas.classList.remove("hidden");
       initHlsPlayer(CAM_EARTHCAM_KEYS[currentCamera]);
-      streamEngineToggle.textContent = "DECODE: NVDEC (2-4s BUFFER)";
+      streamEngineToggle.textContent = "DECODE: NVDEC";
       streamEngineToggle.classList.add("badge-orange");
+    }
+  });
+}
+
+/* ================= 6B. CLIENT-SIDE WEBGPU INFERENCE ENGINE ================= */
+const WEBGPU_TARGET_CLASSES = {
+  0: "person",
+  2: "car",
+  3: "motorcycle",
+  5: "bus",
+  7: "truck",
+  24: "backpack",
+  26: "handbag",
+  28: "suitcase",
+};
+const WEBGPU_TARGET_IDS = [0, 2, 3, 5, 7, 24, 26, 28];
+
+class SentinelWebGPUEngine {
+  constructor() {
+    this.session = null;
+    this.isInitializing = false;
+    this.provider = "Uninitialized";
+    this.activeTracks = new Map();
+    this.trackIdCounter = 1;
+
+    // Fast off-screen pre-processing canvas (480x480)
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = 480;
+    this.canvas.height = 480;
+    this.ctx = this.canvas.getContext("2d", { willReadFrequently: true });
+
+    // Pre-allocated LUT (Lookup Table) for 0-255 -> 0.0-1.0 float normalization
+    this.lut = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      this.lut[i] = i * 0.00392156862745098; // 1 / 255
+    }
+
+    // Pre-allocated planar Float32Array [3, 480, 480]
+    this.floatArr = new Float32Array(3 * 480 * 480);
+  }
+
+  async init() {
+    if (this.session) return true;
+    if (this.isInitializing) {
+      // Wait for in-flight initialization to complete
+      while (this.isInitializing) {
+        await new Promise((r) => setTimeout(r, 80));
+      }
+      return Boolean(this.session);
+    }
+    this.isInitializing = true;
+
+    try {
+      if (typeof ort === "undefined") {
+        console.warn("[WebGPU Engine] ONNX Runtime Web library not detected yet.");
+        this.isInitializing = false;
+        return false;
+      }
+
+      ort.env.wasm.wasmPaths = "/static/vendor/";
+      ort.env.wasm.numThreads = 1;
+
+      // Check if WebGPU is supported by the client browser
+      const hasWebGPU = typeof navigator !== "undefined" && Boolean(navigator.gpu);
+      console.log(`[WebGPU Engine] WebGPU hardware support: ${hasWebGPU}`);
+
+      const sessionOptions = {
+        executionProviders: hasWebGPU
+          ? [
+              {
+                name: "webgpu",
+                deviceType: "gpu",
+                powerPreference: "high-performance",
+              },
+              "wasm",
+            ]
+          : ["wasm"],
+        graphOptimizationLevel: "all",
+      };
+
+      this.session = await ort.InferenceSession.create("/static/models/yolov8n.onnx", sessionOptions);
+      this.provider = hasWebGPU ? "WebGPU" : "WASM";
+      console.log(`[WebGPU Engine] Loaded successfully with ${this.provider} backend.`);
+
+      // Warm up model pipeline with a zero tensor
+      const dummyInput = new ort.Tensor("float32", new Float32Array(3 * 480 * 480), [1, 3, 480, 480]);
+      await this.session.run({ images: dummyInput });
+      console.log("[WebGPU Engine] Pipeline warmed up and ready.");
+
+      this.isInitializing = false;
+      return true;
+    } catch (err) {
+      console.warn("[WebGPU Engine] Primary WebGPU init failed, attempting pure WASM fallback:", err);
+      try {
+        this.session = await ort.InferenceSession.create("/static/models/yolov8n.onnx", {
+          executionProviders: ["wasm"],
+        });
+        this.provider = "WASM";
+        this.isInitializing = false;
+        return true;
+      } catch (fallbackErr) {
+        console.error("[WebGPU Engine] Failed to initialize in-browser ONNX model:", fallbackErr);
+        this.isInitializing = false;
+        return false;
+      }
+    }
+  }
+
+  async detectFrame(videoEl) {
+    if (!this.session || !videoEl || videoEl.paused || videoEl.readyState < 2) return null;
+
+    // 1. Draw frame to 480x480 offscreen canvas
+    this.ctx.drawImage(videoEl, 0, 0, 480, 480);
+    const imgData = this.ctx.getImageData(0, 0, 480, 480).data;
+
+    // 2. Preprocess to CHW planar format using pre-computed LUT
+    const numPixels = 480 * 480;
+    let p1 = 0, p2 = numPixels, p3 = numPixels * 2;
+    const lut = this.lut;
+    const floatArr = this.floatArr;
+    for (let i = 0; i < imgData.length; i += 4) {
+      floatArr[p1++] = lut[imgData[i]];
+      floatArr[p2++] = lut[imgData[i + 1]];
+      floatArr[p3++] = lut[imgData[i + 2]];
+    }
+
+    const inputTensor = new ort.Tensor("float32", floatArr, [1, 3, 480, 480]);
+
+    // 3. Run Inference on Client Device
+    const t0 = performance.now();
+    const feeds = { images: inputTensor };
+    const results = await this.session.run(feeds);
+    const latencyMs = performance.now() - t0;
+
+    // 4. Parse YOLOv8 Output [1, 84, 4725]
+    const outputName = this.session.outputNames[0];
+    const output = results[outputName].data; // Flat Float32Array
+
+    const candidates = [];
+    const NUM_ANCHORS = 4725;
+    const CONF_THRESHOLD = 0.35;
+
+    for (let a = 0; a < NUM_ANCHORS; a++) {
+      let bestScore = 0;
+      let bestClassId = -1;
+
+      for (let k = 0; k < WEBGPU_TARGET_IDS.length; k++) {
+        const clsId = WEBGPU_TARGET_IDS[k];
+        const score = output[(4 + clsId) * NUM_ANCHORS + a];
+        if (score > bestScore) {
+          bestScore = score;
+          bestClassId = clsId;
+        }
+      }
+
+      if (bestScore >= CONF_THRESHOLD) {
+        const cx = output[a];
+        const cy = output[NUM_ANCHORS + a];
+        const w = output[2 * NUM_ANCHORS + a];
+        const h = output[3 * NUM_ANCHORS + a];
+
+        const x1 = Math.max(0.0, Math.min(1.0, (cx - w / 2) / 480.0));
+        const y1 = Math.max(0.0, Math.min(1.0, (cy - h / 2) / 480.0));
+        const x2 = Math.max(0.0, Math.min(1.0, (cx + w / 2) / 480.0));
+        const y2 = Math.max(0.0, Math.min(1.0, (cy + h / 2) / 480.0));
+
+        if (x2 - x1 >= 0.015 && y2 - y1 >= 0.015) {
+          candidates.push({
+            classId: bestClassId,
+            className: WEBGPU_TARGET_CLASSES[bestClassId],
+            score: bestScore,
+            bbox: [x1, y1, x2, y2],
+          });
+        }
+      }
+    }
+
+    // 5. Non-Maximum Suppression (NMS)
+    candidates.sort((a, b) => b.score - a.score);
+    const selected = [];
+    const IOU_THRESHOLD = 0.45;
+
+    for (let i = 0; i < candidates.length && selected.length < 35; i++) {
+      const cand = candidates[i];
+      let discard = false;
+      for (let j = 0; j < selected.length; j++) {
+        if (this.computeIoU(cand.bbox, selected[j].bbox) > IOU_THRESHOLD) {
+          discard = true;
+          break;
+        }
+      }
+      if (!discard) {
+        selected.push(cand);
+      }
+    }
+
+    // 6. Persistent Spatial Tracking Association
+    const tracks = this.associateTracks(selected);
+
+    // 7. Entity Counts
+    let pCount = 0, vCount = 0, parcelCount = 0;
+    for (const t of tracks) {
+      if (t.class === "person") pCount++;
+      else if (["car", "bus", "truck", "motorcycle"].includes(t.class)) vCount++;
+      else parcelCount++;
+    }
+
+    const fps = Math.round(1000 / Math.max(latencyMs, 1));
+
+    return {
+      tracks: tracks,
+      detections: tracks,
+      counts: {
+        person: pCount,
+        vehicle: vCount,
+        parcel: parcelCount,
+      },
+      latency_ms: Math.round(latencyMs * 10) / 10,
+      fps: fps,
+      device: `Client ${this.provider}`,
+    };
+  }
+
+  computeIoU(boxA, boxB) {
+    const xA = Math.max(boxA[0], boxB[0]);
+    const yA = Math.max(boxA[1], boxB[1]);
+    const xB = Math.min(boxA[2], boxB[2]);
+    const yB = Math.min(boxA[3], boxB[3]);
+
+    const interWidth = Math.max(0, xB - xA);
+    const interHeight = Math.max(0, yB - yA);
+    const interArea = interWidth * interHeight;
+
+    const areaA = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1]);
+    const areaB = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1]);
+    const unionArea = areaA + areaB - interArea;
+
+    return unionArea <= 0 ? 0 : interArea / unionArea;
+  }
+
+  associateTracks(detections) {
+    const now = Date.now();
+    const matchedTrackIds = new Set();
+    const resultTracks = [];
+
+    for (const det of detections) {
+      let bestId = null;
+      let bestDist = 0.16; // Max centroid distance threshold (16% of frame)
+
+      const detCx = (det.bbox[0] + det.bbox[2]) / 2;
+      const detCy = (det.bbox[1] + det.bbox[3]) / 2;
+
+      for (const [id, prevTrack] of this.activeTracks.entries()) {
+        if (matchedTrackIds.has(id)) continue;
+        if (prevTrack.class !== det.className) continue;
+
+        const prevCx = (prevTrack.bbox_norm[0] + prevTrack.bbox_norm[2]) / 2;
+        const prevCy = (prevTrack.bbox_norm[1] + prevTrack.bbox_norm[3]) / 2;
+        const dist = Math.hypot(detCx - prevCx, detCy - prevCy);
+
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = id;
+        }
+      }
+
+      let trackId;
+      if (bestId !== null) {
+        trackId = bestId;
+      } else {
+        trackId = this.trackIdCounter++;
+        if (this.trackIdCounter > 9999) this.trackIdCounter = 1;
+      }
+
+      matchedTrackIds.add(trackId);
+
+      let category = "parcel";
+      if (det.className === "person") category = "person";
+      else if (["car", "bus", "truck", "motorcycle"].includes(det.className)) category = "vehicle";
+
+      const trackObj = {
+        id: trackId,
+        class: det.className,
+        category: category,
+        conf: Math.round(det.score * 100) / 100,
+        bbox_norm: [
+          Math.round(det.bbox[0] * 10000) / 10000,
+          Math.round(det.bbox[1] * 10000) / 10000,
+          Math.round(det.bbox[2] * 10000) / 10000,
+          Math.round(det.bbox[3] * 10000) / 10000,
+        ],
+        lastSeen: now,
+      };
+
+      this.activeTracks.set(trackId, trackObj);
+      resultTracks.push(trackObj);
+    }
+
+    // Expire tracks lost for > 600ms
+    for (const [id, t] of this.activeTracks.entries()) {
+      if (now - t.lastSeen > 600) {
+        this.activeTracks.delete(id);
+      }
+    }
+
+    return resultTracks;
+  }
+
+  resetTracks() {
+    this.activeTracks.clear();
+    this.trackIdCounter = 1;
+  }
+}
+
+window.webgpuEngine = new SentinelWebGPUEngine();
+const webgpuEngine = window.webgpuEngine;
+
+// Pre-cache in-browser model during idle time (non-blocking)
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    if (window.webgpuEngine && !window.webgpuEngine.session) {
+      console.log("[Sentinel] Background pre-caching client model into browser memory...");
+      window.webgpuEngine.init().catch((e) => console.log("[Sentinel] Background model prewarm:", e));
+    }
+  }, 2500);
+}
+
+function setupMlEngineModeToggle() {
+  if (!mlEngineModeToggle) return;
+
+  mlEngineModeToggle.addEventListener("click", async () => {
+    if (mlInferenceEngine === "server") {
+      // Switch from Server GPU to Client WebGPU
+      mlInferenceEngine = "webgpu";
+      window.mlInferenceEngine = "webgpu";
+      mlEngineModeToggle.textContent = "ENGINE: CLIENT WEBGPU";
+      mlEngineModeToggle.classList.add("badge-webgpu-active");
+
+      if (streamStatusTag) {
+        streamStatusTag.textContent = "WEBGPU: INITIALIZING...";
+        streamStatusTag.classList.add("badge-webgpu-tag");
+      }
+      if (hudFeedSource) {
+        hudFeedSource.textContent = `${(CAM_TITLES[currentCamera] || "CCTV").toUpperCase()} // YOLOv8 CLIENT WEBGPU (IN-BROWSER)`;
+      }
+      if (streamMetricPrecision) streamMetricPrecision.textContent = "FP32 / FP16 WEBGPU";
+      if (streamMetricTracker) streamMetricTracker.textContent = "In-Browser ONNX";
+      if (topHwChip) topHwChip.textContent = "CLIENT WEBGPU • IN-BROWSER INFERENCE • 0% HOST LOAD";
+
+      // Initialize session if not loaded
+      const ready = await webgpuEngine.init();
+      console.log("[Toggle Click] Engine init returned:", ready, "Session:", Boolean(webgpuEngine.session));
+      if (!ready) {
+        if (streamStatusTag) streamStatusTag.textContent = "WEBGPU: UNAVAILABLE";
+        setTimeout(() => {
+          // Revert cleanly if WebGPU unavailable on this client
+          mlInferenceEngine = "server";
+          window.mlInferenceEngine = "server";
+          mlEngineModeToggle.textContent = "ENGINE: SERVER GPU";
+          mlEngineModeToggle.classList.remove("badge-webgpu-active");
+          if (streamStatusTag) {
+            streamStatusTag.textContent = "YOLO ON FEED: ACTIVE";
+            streamStatusTag.classList.remove("badge-webgpu-tag");
+          }
+        }, 1500);
+      } else {
+        if (streamStatusTag) streamStatusTag.textContent = "WEBGPU ON FEED: ACTIVE";
+      }
+    } else {
+      // Switch back to Server GPU (RTX 3050 FP16)
+      mlInferenceEngine = "server";
+      window.mlInferenceEngine = "server";
+      mlEngineModeToggle.textContent = "ENGINE: SERVER GPU";
+      mlEngineModeToggle.classList.remove("badge-webgpu-active");
+
+      if (streamStatusTag) {
+        streamStatusTag.textContent = "YOLO ON FEED: ACTIVE";
+        streamStatusTag.classList.remove("badge-webgpu-tag");
+      }
+      if (hudFeedSource) {
+        hudFeedSource.textContent = `${(CAM_TITLES[currentCamera] || "CCTV").toUpperCase()} // YOLOv8 REAL-TIME (RTX 3050)`;
+      }
+      if (streamMetricPrecision) streamMetricPrecision.textContent = "FP16 CUDA";
+      if (streamMetricTracker) streamMetricTracker.textContent = "ByteTrack v2";
+      if (topHwChip) topHwChip.textContent = "RTX 3050 • FP16 TENSOR CORES • BYTETRACK";
     }
   });
 }
@@ -647,11 +1046,46 @@ function updateStreamAnalytics(data, tracks) {
 function startFrameInferenceLoop() {
   function loop() {
     if (currentView === "stream" && streamEngine === "nvdec" && nativeHlsVideo && !nativeHlsVideo.paused && nativeHlsVideo.readyState >= 2) {
-      detectCurrentFeedFrame().then(() => {
-        setTimeout(loop, 30);
-      }).catch(() => {
-        setTimeout(loop, 50);
-      });
+      if (mlInferenceEngine === "webgpu") {
+        if (!isDetecting) {
+          isDetecting = true;
+          (async () => {
+            try {
+              if (!webgpuEngine.session) {
+                await webgpuEngine.init();
+              }
+              const data = await webgpuEngine.detectFrame(nativeHlsVideo);
+              if (data && mlInferenceEngine === "webgpu") {
+                const tracks = data.tracks || [];
+                updatePersistentTracks(tracks);
+                updateStreamAnalytics(data, tracks);
+                if (hudStatsTelemetry) {
+                  hudStatsTelemetry.textContent = `LATENCY: ${data.latency_ms}ms • ${data.fps} FPS (${data.device.toUpperCase()})`;
+                }
+                if (hudDetectionCount && data.counts) {
+                  const total = data.counts.person + data.counts.vehicle + data.counts.parcel;
+                  hudDetectionCount.textContent = `DETECTED: ${data.counts.person} HUMANS, ${data.counts.vehicle} VEHICLES`;
+                  if (streamStatusTag) {
+                    streamStatusTag.textContent = `WEBGPU: ${total} ACTIVE`;
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn("[WebGPU] Detection loop warning:", err);
+            } finally {
+              isDetecting = false;
+            }
+          })();
+        }
+        setTimeout(loop, 25);
+      } else {
+        // SERVER GPU MODE (100% UNCHANGED)
+        detectCurrentFeedFrame().then(() => {
+          setTimeout(loop, 30);
+        }).catch(() => {
+          setTimeout(loop, 50);
+        });
+      }
     } else {
       setTimeout(loop, 80);
     }

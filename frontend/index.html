@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/styles.css?v=16.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=17.0" />
 </head>
 <body class="bg-halfwhite text-obsidian no-scroll">
 
@@ -83,7 +83,7 @@
           <span class="pulse-dot"></span>
           <span class="status-label">3 NODES ONLINE</span>
         </div>
-        <div class="hw-chip">RTX 3050 &bull; FP16 TENSOR CORES &bull; BYTETRACK</div>
+        <div class="hw-chip" id="top-hw-chip">RTX 3050 &bull; FP16 TENSOR CORES &bull; BYTETRACK</div>
       </div>
 
       <div class="nav-right">
@@ -284,8 +284,11 @@
         </div>
 
         <div class="stream-actions">
+          <button id="ml-engine-mode-toggle" class="badge-tag badge-interactive" title="Toggle between Server GPU (RTX 3050) and Client-Side In-Browser WebGPU">
+            ENGINE: SERVER GPU
+          </button>
           <button id="stream-engine-toggle" class="badge-tag badge-interactive" title="Toggle Hardware NVDEC">
-            DECODE: NVDEC (2-4s BUFFER)
+            DECODE: NVDEC
           </button>
           <span class="badge-tag badge-orange" id="stream-status-tag">YOLO ON FEED: ACTIVE</span>
         </div>
@@ -420,11 +423,11 @@
               </div>
               <div class="telem-item">
                 <span class="telem-lbl">PRECISION</span>
-                <span class="telem-val">FP16 CUDA</span>
+                <span class="telem-val" id="stream-metric-precision">FP16 CUDA</span>
               </div>
               <div class="telem-item">
                 <span class="telem-lbl">TRACKER</span>
-                <span class="telem-val">ByteTrack v2</span>
+                <span class="telem-val" id="stream-metric-tracker">ByteTrack v2</span>
               </div>
             </div>
           </div>
@@ -478,8 +481,10 @@
 
   </div>
 
+  <!-- ONNX Runtime Web for In-Browser WebGPU & WASM Acceleration -->
+  <script src="/static/vendor/ort.all.min.js"></script>
   <!-- HLS Player & Core Application Script -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="/static/app.js?v=16.0"></script>
+  <script src="/static/app.js?v=17.0"></script>
 </body>
 </html>

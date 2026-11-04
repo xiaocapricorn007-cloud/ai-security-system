@@ -1128,7 +1128,7 @@ html, body {
 
 .stream-top-bar {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(500px, 1fr);
   align-items: center;
   height: 46px;
   min-height: 46px;
@@ -1267,13 +1267,41 @@ html, body {
   border-color: var(--text-obsidian);
 }
 
+#ml-engine-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 175px;
+  min-width: 175px;
+  max-width: 175px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#ml-engine-mode-toggle.badge-webgpu-active {
+  background: #ECFDF5;
+  color: #047857;
+  border-color: #6EE7B7;
+  font-weight: 600;
+}
+
+#ml-engine-mode-toggle.badge-webgpu-active:hover {
+  background: #047857;
+  color: #FFFFFF;
+  border-color: #047857;
+}
+
 #stream-engine-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 190px;
-  min-width: 190px;
-  max-width: 190px;
+  width: 135px;
+  min-width: 135px;
+  max-width: 135px;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -1296,6 +1324,13 @@ html, body {
   overflow: hidden;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+#stream-status-tag.badge-webgpu-tag {
+  background: #ECFDF5;
+  color: #047857;
+  border-color: #6EE7B7;
 }
 
 /* ================= STREAM CONTENT SPLIT (LEFT VIDEO | RIGHT ANALYTICS & CHAT) ================= */
