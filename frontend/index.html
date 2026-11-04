@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/styles.css?v=14.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=15.0" />
 </head>
 <body class="bg-halfwhite text-obsidian no-scroll">
 
@@ -260,9 +260,10 @@
     </main>
 
 
-    <!-- ================= VIEW B: DEDICATED STREAM & ML MODEL VIEW (FIT TO SCREEN) ================= -->
+    <!-- ================= VIEW B: DEDICATED STREAM & ANALYTICS VIEW (SPLIT LAYOUT) ================= -->
     <main id="stream-view" class="stream-container hidden">
       
+      <!-- STREAM TOP BAR -->
       <div class="stream-top-bar">
         <button id="btn-back-to-landing" class="btn-back-hub">
           <span class="back-arrow">&larr;</span>
@@ -288,64 +289,187 @@
         </div>
       </div>
 
-      <!-- Main Video Panel with Canvas Overlay -->
-      <div class="stream-main-card">
-        <div class="video-wrapper" id="video-wrapper">
-          <!-- Native Hardware HLS Video Player -->
-          <video 
-            id="native-hls-video" 
-            class="live-stream-player" 
-            autoplay 
-            muted 
-            playsinline
-            crossorigin="anonymous"
-          ></video>
+      <!-- STREAM CONTENT SPLIT: LEFT VIDEO ON USUAL SIZE | RIGHT ANALYTICS & CHAT -->
+      <div class="stream-content-split">
+        
+        <!-- LEFT: VIDEO ON USUAL SIZE WITH CANVAS & TIMELINE UNDERNEATH -->
+        <div class="stream-video-col">
+          <div class="video-wrapper" id="video-wrapper">
+            <!-- Native Hardware HLS Video Player -->
+            <video 
+              id="native-hls-video" 
+              class="live-stream-player" 
+              autoplay 
+              muted 
+              playsinline
+              crossorigin="anonymous"
+            ></video>
 
-          <!-- Fallback Image Stream -->
-          <img 
-            id="live-ai-stream" 
-            class="live-stream-player hidden" 
-            src="" 
-            alt="Real-Time Surveillance Stream" 
-          />
+            <!-- Fallback Image Stream -->
+            <img 
+              id="live-ai-stream" 
+              class="live-stream-player hidden" 
+              src="" 
+              alt="Real-Time Surveillance Stream" 
+            />
 
-          <!-- Bounding Box Canvas -->
-          <canvas id="cctv-canvas" width="960" height="540"></canvas>
+            <!-- Bounding Box Canvas -->
+            <canvas id="cctv-canvas" width="960" height="540"></canvas>
 
-          <!-- CCTV HUD Overlays -->
-          <div class="cctv-overlay">
-            <div class="cctv-hud-top">
-              <span id="hud-feed-source">TIMES SQUARE // YOLOv8 REAL-TIME (RTX 3050)</span>
-              <span id="hud-cam-time">02:00:22 PM</span>
+            <!-- CCTV HUD Overlays -->
+            <div class="cctv-overlay">
+              <div class="cctv-hud-top">
+                <span id="hud-feed-source">TIMES SQUARE // YOLOv8 REAL-TIME (RTX 3050)</span>
+                <span id="hud-cam-time">02:00:22 PM</span>
+              </div>
+              <div class="cctv-hud-bottom">
+                <span id="hud-stats-telemetry">LATENCY: 24.2ms &bull; 60 FPS (NVDEC ACCEL)</span>
+                <span id="hud-detection-count">LIVE DETECTIONS: ACTIVE</span>
+              </div>
             </div>
-            <div class="cctv-hud-bottom">
-              <span id="hud-stats-telemetry">LATENCY: 24.2ms &bull; 60 FPS (NVDEC ACCEL)</span>
-              <span id="hud-detection-count">LIVE DETECTIONS: ACTIVE</span>
+          </div>
+
+          <!-- Video Timeline with Event Markers -->
+          <div class="timeline-container">
+            <div class="timeline-header">
+              <div class="timeline-title">Surveillance Index Timeline</div>
+              <div class="timeline-playback-time" id="playback-time-label">02:00:22 PM (142s)</div>
+            </div>
+
+            <div class="timeline-track" id="timeline-track">
+              <div class="timeline-progress" id="timeline-progress" style="width: 60%;"></div>
+              <div class="timeline-scrubber" id="timeline-scrubber" style="left: 60%;"></div>
+              <div class="event-markers" id="event-markers"></div>
+            </div>
+
+            <div class="timeline-axis">
+              <span>11:00 AM</span>
+              <span>12:00 PM</span>
+              <span>01:00 PM</span>
+              <span>02:00 PM</span>
+              <span>03:00 PM</span>
             </div>
           </div>
         </div>
 
-        <!-- Video Timeline with Event Markers -->
-        <div class="timeline-container">
-          <div class="timeline-header">
-            <div class="timeline-title">Surveillance Index Timeline</div>
-            <div class="timeline-playback-time" id="playback-time-label">02:00:22 PM (142s)</div>
+        <!-- RIGHT: LIVE ANALYTICS (TOP) + CHAT BOX AT BOTTOM RIGHT -->
+        <aside class="stream-sidebar-col">
+          
+          <!-- TOP: LIVE ANALYTICS PANEL -->
+          <div class="stream-panel stream-analytics-card">
+            <div class="panel-header-compact">
+              <div>
+                <span class="section-tag">SECTOR TELEMETRY</span>
+                <h3 class="compact-title" id="stream-analytics-heading">Current Detections</h3>
+              </div>
+              <span class="cam-status-pill">
+                <span class="pulse-dot"></span>
+                <span>BYTETRACK GPU</span>
+              </span>
+            </div>
+
+            <!-- Big Metric Counters for this stream -->
+            <div class="stream-metrics-grid">
+              <div class="metric-box metric-human">
+                <div class="metric-top">
+                  <span class="metric-icon">&#128100;</span>
+                  <span class="metric-label">Humans</span>
+                </div>
+                <div class="metric-val" id="stream-count-persons">14</div>
+              </div>
+
+              <div class="metric-box metric-vehicle">
+                <div class="metric-top">
+                  <span class="metric-icon">&#128663;</span>
+                  <span class="metric-label">Vehicles</span>
+                </div>
+                <div class="metric-val" id="stream-count-vehicles">9</div>
+              </div>
+
+              <div class="metric-box metric-parcel">
+                <div class="metric-top">
+                  <span class="metric-icon">&#128230;</span>
+                  <span class="metric-label">Parcels</span>
+                </div>
+                <div class="metric-val" id="stream-count-parcels">1</div>
+              </div>
+            </div>
+
+            <!-- Active Tracked Entities Chip List -->
+            <div class="active-tracks-wrapper">
+              <div class="tracks-header">
+                <span>Active Tracked Objects:</span>
+                <span class="tracks-total" id="stream-total-tracks-badge">Active</span>
+              </div>
+              <div class="active-tracks-scroll" id="stream-active-tracks-list">
+                <!-- Dynamically populated with active ByteTrack chips -->
+              </div>
+            </div>
+
+            <!-- Hardware & Latency Telemetry -->
+            <div class="stream-telemetry-row">
+              <div class="telem-item">
+                <span class="telem-lbl">INFERENCE</span>
+                <span class="telem-val" id="stream-metric-latency">24.2ms</span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-lbl">THROUGHPUT</span>
+                <span class="telem-val" id="stream-metric-fps">60 FPS</span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-lbl">PRECISION</span>
+                <span class="telem-val">FP16 CUDA</span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-lbl">TRACKER</span>
+                <span class="telem-val">ByteTrack v2</span>
+              </div>
+            </div>
           </div>
 
-          <div class="timeline-track" id="timeline-track">
-            <div class="timeline-progress" id="timeline-progress" style="width: 60%;"></div>
-            <div class="timeline-scrubber" id="timeline-scrubber" style="left: 60%;"></div>
-            <div class="event-markers" id="event-markers"></div>
+          <!-- BOTTOM RIGHT: STREAM CHAT BOX -->
+          <div class="stream-panel stream-chat-card">
+            <div class="panel-header-compact">
+              <span class="section-tag">STREAM REASONING</span>
+              <h3 class="compact-title">Feed Query Agent</h3>
+            </div>
+
+            <div class="chat-chips-row">
+              <button class="stream-chat-chip" data-query="Are there any unattended parcels in this feed?">
+                &ldquo;Unattended parcels?&rdquo;
+              </button>
+              <button class="stream-chat-chip" data-query="How many pedestrians are currently detected?">
+                &ldquo;Pedestrian flow?&rdquo;
+              </button>
+              <button class="stream-chat-chip" data-query="Summarize recent activity in this camera">
+                &ldquo;Summarize activity&rdquo;
+              </button>
+            </div>
+
+            <!-- Stream Chat Input Form -->
+            <form id="stream-chat-form" class="landing-chat-form">
+              <div class="chat-input-wrapper">
+                <input 
+                  type="text" 
+                  id="stream-chat-input" 
+                  placeholder="Ask intelligence agent about this stream..." 
+                  required 
+                />
+                <button type="submit" class="btn-chat-submit" id="stream-chat-submit">
+                  <span>Ask</span>
+                  <span class="arrow">&rarr;</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Stream Chat Result Card -->
+            <div id="stream-chat-result" class="chat-result-card hidden">
+              <!-- Dynamically populated -->
+            </div>
           </div>
 
-          <div class="timeline-axis">
-            <span>11:00 AM</span>
-            <span>12:00 PM</span>
-            <span>01:00 PM</span>
-            <span>02:00 PM</span>
-            <span>03:00 PM</span>
-          </div>
-        </div>
+        </aside>
+
       </div>
 
     </main>
@@ -354,6 +478,6 @@
 
   <!-- HLS Player & Core Application Script -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="/static/app.js?v=14.0"></script>
+  <script src="/static/app.js?v=15.0"></script>
 </body>
 </html>

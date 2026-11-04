@@ -76,6 +76,22 @@ const hudDetectionCount = document.getElementById("hud-detection-count");
 const hudFeedSource = document.getElementById("hud-feed-source");
 const hudCamTime = document.getElementById("hud-cam-time");
 
+// Stream Analytics & Telemetry Elements
+const streamCountPersons = document.getElementById("stream-count-persons");
+const streamCountVehicles = document.getElementById("stream-count-vehicles");
+const streamCountParcels = document.getElementById("stream-count-parcels");
+const streamActiveTracksList = document.getElementById("stream-active-tracks-list");
+const streamTotalTracksBadge = document.getElementById("stream-total-tracks-badge");
+const streamMetricLatency = document.getElementById("stream-metric-latency");
+const streamMetricFps = document.getElementById("stream-metric-fps");
+const streamAnalyticsHeading = document.getElementById("stream-analytics-heading");
+
+// Stream Chat Elements (Bottom Right)
+const streamChatForm = document.getElementById("stream-chat-form");
+const streamChatInput = document.getElementById("stream-chat-input");
+const streamChatSubmit = document.getElementById("stream-chat-submit");
+const streamChatResult = document.getElementById("stream-chat-result");
+
 // Scrubber Elements
 const timelineTrack = document.getElementById("timeline-track");
 const timelineProgress = document.getElementById("timeline-progress");
@@ -224,6 +240,7 @@ function initApp() {
   setupStreamEngineToggle();
   setupStreamPills();
   setupLandingChat();
+  setupStreamChat();
   setupTimelineScrubbing();
   startCctvRenderLoop();
   startFrameInferenceLoop();
@@ -357,6 +374,7 @@ async function switchCameraChannel(camId) {
   // Update Header UI
   if (streamCamId) streamCamId.textContent = CAM_CODES[camId] || "CAM-01";
   if (streamCamTitle) streamCamTitle.textContent = CAM_TITLES[camId] || camId;
+  if (streamAnalyticsHeading) streamAnalyticsHeading.textContent = `${CAM_CODES[camId]} Current Detections`;
   if (hudFeedSource) hudFeedSource.textContent = `${CAM_TITLES[camId].toUpperCase()} // YOLOv8 FP16 (RTX 3050)`;
 
   // Update Active Pills in Stream Top Bar
@@ -564,6 +582,7 @@ async function detectCurrentFeedFrame() {
       const data = await res.json();
       const tracks = data.tracks || data.detections || [];
       updatePersistentTracks(tracks);
+      updateStreamAnalytics(data, tracks);
 
       if (hudStatsTelemetry) {
         hudStatsTelemetry.textContent = `LATENCY: ${data.latency_ms}ms • ${data.fps} FPS (YOLOv8 FP16 BYTETRACK)`;
@@ -581,6 +600,47 @@ async function detectCurrentFeedFrame() {
     // network retry
   } finally {
     isDetecting = false;
+  }
+}
+
+function updateStreamAnalytics(data, tracks) {
+  if (currentView !== "stream") return;
+
+  if (data.counts) {
+    if (streamCountPersons) streamCountPersons.textContent = data.counts.person || 0;
+    if (streamCountVehicles) streamCountVehicles.textContent = data.counts.vehicle || 0;
+    if (streamCountParcels) streamCountParcels.textContent = data.counts.parcel || 0;
+  }
+
+  if (streamMetricLatency && data.latency_ms !== undefined) {
+    streamMetricLatency.textContent = `${data.latency_ms}ms`;
+  }
+
+  if (streamMetricFps && data.fps !== undefined) {
+    streamMetricFps.textContent = `${data.fps} FPS`;
+  }
+
+  if (streamTotalTracksBadge) {
+    streamTotalTracksBadge.textContent = `${tracks.length} Objects`;
+  }
+
+  if (streamActiveTracksList) {
+    if (tracks.length === 0) {
+      streamActiveTracksList.innerHTML = `<span style="font-size: 10px; color: var(--text-muted); font-style: italic;">No active objects in frame</span>`;
+    } else {
+      streamActiveTracksList.innerHTML = tracks.map((t) => {
+        let chipClass = "track-chip-person";
+        let icon = "&#128100;";
+        if (["vehicle", "car", "bus", "truck", "motorcycle"].includes(t.class)) {
+          chipClass = "track-chip-vehicle";
+          icon = "&#128663;";
+        } else if (["parcel", "suitcase", "backpack", "handbag"].includes(t.class)) {
+          chipClass = "track-chip-parcel";
+          icon = "&#128230;";
+        }
+        return `<span class="track-chip ${chipClass}">${icon} ${t.class.toUpperCase()} #${t.id} (${Math.round(t.conf * 100)}%)</span>`;
+      }).join("");
+    }
   }
 }
 
@@ -879,6 +939,69 @@ function renderChatResult(data) {
       Multi-Sector Spatial Verification &bull; Confidence: ${data.confidence || '96%'}
     </div>
   `;
+}
+
+/* ================= 12. STREAM VIEW CHAT BOX (BOTTOM RIGHT) ================= */
+function setupStreamChat() {
+  if (streamChatForm) {
+    streamChatForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const q = streamChatInput ? streamChatInput.value.trim() : "";
+      if (q) runStreamQuery(q);
+    });
+  }
+
+  document.querySelectorAll(".stream-chat-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const q = chip.dataset.query;
+      if (streamChatInput) streamChatInput.value = q;
+      runStreamQuery(q);
+    });
+  });
+}
+
+async function runStreamQuery(query) {
+  if (!streamChatResult) return;
+  streamChatResult.classList.remove("hidden");
+  streamChatResult.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 11px;">
+      <span class="pulse-dot"></span>
+      <span>Reasoning across ${CAM_TITLES[currentCamera]} live stream...</span>
+    </div>
+  `;
+
+  if (streamChatSubmit) streamChatSubmit.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/agent/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: `${query} [Camera: ${currentCamera}]` }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const answer = data.answer || data.synthesis || "Sector surveillance analysis complete.";
+      const status = data.status || "ANALYSIS_COMPLETE";
+      
+      streamChatResult.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <h4 class="chat-result-title" style="font-size: 14px;">Stream Intelligence</h4>
+          <span class="threat-pill" style="font-size: 9px;"><span class="threat-dot"></span>${status}</span>
+        </div>
+        <p style="color: var(--text-obsidian); font-size: 11px; line-height: 1.4;">${answer}</p>
+        <div style="margin-top: 6px; font-size: 10px; font-family: var(--font-mono); color: var(--text-light); text-align: right;">
+          ${CAM_CODES[currentCamera]} Spatial Verification &bull; Conf: ${data.confidence || '96%'}
+        </div>
+      `;
+    } else {
+      streamChatResult.innerHTML = `<div style="color: #DC2626; font-size: 11px;">Error obtaining insights. Please retry.</div>`;
+    }
+  } catch (err) {
+    streamChatResult.innerHTML = `<div style="color: #DC2626; font-size: 11px;">Server error querying reasoning engine.</div>`;
+  } finally {
+    if (streamChatSubmit) streamChatSubmit.disabled = false;
+  }
 }
 
 // Start Application on Load

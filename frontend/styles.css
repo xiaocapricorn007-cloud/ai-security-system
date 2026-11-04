@@ -1233,17 +1233,22 @@ html, body {
   border-color: rgba(255, 78, 0, 0.2);
 }
 
-/* VIDEO WRAPPER & SCRUBBER IN STREAM VIEW */
-.stream-main-card {
+/* ================= STREAM CONTENT SPLIT (LEFT VIDEO | RIGHT ANALYTICS & CHAT) ================= */
+.stream-content-split {
+  display: grid;
+  grid-template-columns: 1.62fr 1fr;
+  gap: 12px;
   flex: 1;
   min-height: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 10px 14px;
-  box-shadow: var(--shadow-subtle);
+  overflow: hidden;
+}
+
+.stream-video-col {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1252,7 +1257,7 @@ html, body {
   min-height: 0;
   position: relative;
   width: 100%;
-  max-height: calc(100% - 64px);
+  max-height: calc(100% - 62px);
   aspect-ratio: 16 / 9;
   margin: 0 auto;
   background: #0A0A0A;
@@ -1284,7 +1289,7 @@ html, body {
 .cctv-overlay {
   position: absolute;
   inset: 0;
-  padding: 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1302,31 +1307,31 @@ html, body {
   text-shadow: 0 1px 3px rgba(0,0,0,0.9);
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* COMPACT SCRUBBABLE TIMELINE */
 .timeline-container {
-  margin-top: 8px;
-  background: var(--bg-subtle);
+  background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 8px 12px;
+  padding: 6px 12px;
   flex-shrink: 0;
+  box-shadow: var(--shadow-subtle);
 }
 
 .timeline-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .timeline-title {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1342,12 +1347,12 @@ html, body {
 
 .timeline-track {
   position: relative;
-  height: 18px;
-  background: var(--bg-card);
+  height: 16px;
+  background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .timeline-progress {
@@ -1411,4 +1416,207 @@ html, body {
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--text-light);
+}
+
+/* RIGHT SIDEBAR: ANALYTICS (TOP) + CHAT (BOTTOM) */
+.stream-sidebar-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.stream-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-subtle);
+}
+
+/* LIVE ANALYTICS CARD */
+.stream-analytics-card {
+  flex: 1.1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.stream-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.metric-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.metric-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.metric-val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-obsidian);
+}
+
+.metric-human .metric-val { color: #065F46; }
+.metric-vehicle .metric-val { color: #075985; }
+.metric-parcel .metric-val { color: #92400E; }
+
+/* ACTIVE TRACKED OBJECTS */
+.active-tracks-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 6px 0;
+  overflow: hidden;
+}
+
+.tracks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.tracks-total {
+  color: var(--accent-orange);
+}
+
+.active-tracks-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-content: flex-start;
+  padding-right: 2px;
+}
+
+.active-tracks-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+
+.active-tracks-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+.track-chip {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.track-chip-person {
+  background: var(--accent-emerald-light);
+  color: #065F46;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.track-chip-vehicle {
+  background: var(--accent-cyan-light);
+  color: #075985;
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+.track-chip-parcel {
+  background: var(--accent-amber-light);
+  color: #92400E;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* TELEMETRY ROW */
+.stream-telemetry-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.telem-item {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 3px 4px;
+  text-align: center;
+}
+
+.telem-lbl {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.telem-val {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-obsidian);
+}
+
+/* STREAM CHAT CARD (BOTTOM RIGHT) */
+.stream-chat-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.stream-chat-chip {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 2px 7px;
+  font-size: 9px;
+  color: var(--text-obsidian);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.stream-chat-chip:hover {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+  background: #FFF;
 }
