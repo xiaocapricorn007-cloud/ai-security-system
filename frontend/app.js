@@ -251,6 +251,50 @@ captureCanvas.width = 640;
 captureCanvas.height = 360;
 const captureCtx = captureCanvas.getContext("2d", { willReadFrequently: true });
 
+// Persistent track dictionary keyed by ByteTrack persistent track ID
+const persistentTracks = new Map();
+
+function updatePersistentTracks(newDetections) {
+  const now = Date.now();
+  const seenIds = new Set();
+
+  for (const det of newDetections) {
+    const id = det.id;
+    seenIds.add(id);
+
+    if (persistentTracks.has(id)) {
+      const t = persistentTracks.get(id);
+      t.targetBbox = det.bbox;
+      t.class = det.class;
+      t.conf = det.conf;
+      t.lastSeen = now;
+      t.alpha = 1.0;
+    } else {
+      persistentTracks.set(id, {
+        id: id,
+        bbox: [...det.bbox],
+        targetBbox: [...det.bbox],
+        class: det.class,
+        conf: det.conf,
+        lastSeen: now,
+        alpha: 1.0,
+      });
+    }
+  }
+
+  // Gracefully retire tracks not detected for > 450ms (prevents single-frame blinking)
+  for (const [id, t] of persistentTracks.entries()) {
+    if (!seenIds.has(id)) {
+      const age = now - t.lastSeen;
+      if (age > 450) {
+        persistentTracks.delete(id);
+      } else {
+        t.alpha = Math.max(0.1, 1.0 - (age / 450));
+      }
+    }
+  }
+}
+
 async function detectCurrentFeedFrame() {
   if (isDetecting || streamEngine !== "nvdec" || !nativeHlsVideo) return;
   if (nativeHlsVideo.paused || nativeHlsVideo.ended || nativeHlsVideo.readyState < 2) return;
@@ -278,11 +322,11 @@ async function detectCurrentFeedFrame() {
         if (res.ok) {
           const data = await res.json();
           if (data.detections) {
-            activeDetections = data.detections;
+            updatePersistentTracks(data.detections);
           }
 
           if (hudStatsTelemetry) {
-            hudStatsTelemetry.textContent = `LATENCY: ${data.latency_ms}ms • ${data.fps} FPS (YOLOv8 FP16 ON WEBSITE FEED)`;
+            hudStatsTelemetry.textContent = `LATENCY: ${data.latency_ms}ms • ${data.fps} FPS (YOLOv8 FP16 BYTETRACK ON FEED)`;
           }
 
           if (hudDetectionCount && data.counts) {
@@ -304,9 +348,19 @@ async function detectCurrentFeedFrame() {
   }
 }
 
+function scheduleNextDetection() {
+  if (streamEngine === "nvdec" && nativeHlsVideo && !nativeHlsVideo.paused && nativeHlsVideo.readyState >= 2) {
+    detectCurrentFeedFrame().finally(() => {
+      setTimeout(scheduleNextDetection, 35);
+    });
+  } else {
+    setTimeout(scheduleNextDetection, 80);
+  }
+}
+
 function startStatsPolling() {
-  // 1. High-speed YOLO inference directly on the active website video feed
-  setInterval(detectCurrentFeedFrame, 75);
+  // 1. Adaptive, non-overlapping frame inference directly on website feed
+  scheduleNextDetection();
 
   // 2. Secondary telemetry polling for composite mode
   async function poll() {
@@ -495,52 +549,31 @@ window.jumpToEvent = function (offsetSec, camId = null) {
 
 /* ================= 6. CCTV CANVAS RENDERER ================= */
 function startCctvRenderLoop() {
-  let smoothedBoxes = [];
-
   function render() {
     ctx.clearRect(0, 0, cctvCanvas.width, cctvCanvas.height);
 
     if (streamEngine === "nvdec") {
-      // Sync tracked objects count
-      while (smoothedBoxes.length < activeDetections.length) {
-        const item = activeDetections[smoothedBoxes.length];
-        smoothedBoxes.push({
-          bbox: [...item.bbox],
-          class: item.class,
-          conf: item.conf,
-        });
-      }
-      if (smoothedBoxes.length > activeDetections.length) {
-        smoothedBoxes = smoothedBoxes.slice(0, activeDetections.length);
-      }
+      for (const [id, t] of persistentTracks.entries()) {
+        // Smooth Exponential Moving Average position tracking
+        t.bbox[0] += (t.targetBbox[0] - t.bbox[0]) * 0.35;
+        t.bbox[1] += (t.targetBbox[1] - t.bbox[1]) * 0.35;
+        t.bbox[2] += (t.targetBbox[2] - t.bbox[2]) * 0.35;
+        t.bbox[3] += (t.targetBbox[3] - t.bbox[3]) * 0.35;
 
-      for (let i = 0; i < smoothedBoxes.length; i++) {
-        const target = activeDetections[i];
-        const current = smoothedBoxes[i];
-        if (!target || !target.bbox) continue;
-
-        // Smooth EMA/LERP coordinate tracking at 60 FPS
-        current.bbox[0] += (target.bbox[0] - current.bbox[0]) * 0.35;
-        current.bbox[1] += (target.bbox[1] - current.bbox[1]) * 0.35;
-        current.bbox[2] += (target.bbox[2] - current.bbox[2]) * 0.35;
-        current.bbox[3] += (target.bbox[3] - current.bbox[3]) * 0.35;
-        current.class = target.class;
-        current.conf = target.conf;
-
-        const x = current.bbox[0];
-        const y = current.bbox[1];
-        const w = Math.max(10, current.bbox[2] - current.bbox[0]);
-        const h = Math.max(10, current.bbox[3] - current.bbox[1]);
+        const x = t.bbox[0];
+        const y = t.bbox[1];
+        const w = Math.max(12, t.bbox[2] - t.bbox[0]);
+        const h = Math.max(12, t.bbox[3] - t.bbox[1]);
 
         let color = "#00E676"; // Emerald for persons
-        if (["vehicle", "car", "bus", "truck", "motorcycle"].includes(current.class)) {
+        if (["vehicle", "car", "bus", "truck", "motorcycle"].includes(t.class)) {
           color = "#29B6F6"; // Cyan for vehicles
-        } else if (["parcel", "suitcase", "backpack", "handbag"].includes(current.class)) {
+        } else if (["parcel", "suitcase", "backpack", "handbag"].includes(t.class)) {
           color = "#FF4E00"; // Orange for parcels
         }
 
-        const label = `${current.class.toUpperCase()} ${Math.round(current.conf * 100)}%`;
-        drawTargetBox(ctx, x, y, w, h, label, color, false);
+        const label = `${t.class.toUpperCase()} ${Math.round(t.conf * 100)}%`;
+        drawTargetBox(ctx, x, y, w, h, label, color, false, t.alpha);
       }
     }
 
@@ -550,8 +583,9 @@ function startCctvRenderLoop() {
   requestAnimationFrame(render);
 }
 
-function drawTargetBox(ctx, x, y, w, h, label, color, isAlert = false) {
+function drawTargetBox(ctx, x, y, w, h, label, color, isAlert = false, alpha = 1.0) {
   ctx.save();
+  ctx.globalAlpha = Math.max(0.05, alpha || 1.0);
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
 

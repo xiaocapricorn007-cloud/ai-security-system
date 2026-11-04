@@ -128,11 +128,13 @@ async def detect_feed_frame(file: UploadFile = File(...)):
         return {"detections": [], "counts": {}, "latency_ms": 0}
 
     t0 = time.time()
-    results = live_detector.model.predict(
+    results = live_detector.model.track(
         frame,
+        persist=True,
+        tracker="bytetrack.yaml",
         device=live_detector.device,
         imgsz=480,
-        conf=0.28,
+        conf=0.35,
         classes=live_detector.target_classes,
         verbose=False,
     )
@@ -146,12 +148,14 @@ async def detect_feed_frame(file: UploadFile = File(...)):
     boxes = results[0].boxes
     p_count, v_count, item_count = 0, 0, 0
 
-    if boxes is not None:
-        for b in boxes:
+    if boxes is not None and len(boxes) > 0:
+        has_ids = boxes.id is not None
+        for idx, b in enumerate(boxes):
             cls_id = int(b.cls[0].item())
             cls_name = live_detector.model.names[cls_id]
             conf = float(b.conf[0].item())
             raw_box = b.xyxy[0].tolist()
+            track_id = int(b.id[0].item()) if has_ids else (idx + 1)
 
             x1 = int(round(raw_box[0] * scale_x))
             y1 = int(round(raw_box[1] * scale_y))
@@ -167,6 +171,7 @@ async def detect_feed_frame(file: UploadFile = File(...)):
                 item_count += 1
 
             detections.append({
+                "id": track_id,
                 "bbox": [x1, y1, x2, y2],
                 "class": cls_lower,
                 "conf": round(conf, 2),
