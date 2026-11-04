@@ -257,14 +257,25 @@ const persistentTracks = new Map();
 function updatePersistentTracks(newDetections) {
   const now = Date.now();
   const seenIds = new Set();
+  const cw = cctvCanvas.width || 960;
+  const ch = cctvCanvas.height || 540;
 
   for (const det of newDetections) {
     const id = det.id;
     seenIds.add(id);
 
+    const targetBbox = det.bbox_norm
+      ? [
+          det.bbox_norm[0] * cw,
+          det.bbox_norm[1] * ch,
+          det.bbox_norm[2] * cw,
+          det.bbox_norm[3] * ch,
+        ]
+      : (det.bbox || [0, 0, 0, 0]);
+
     if (persistentTracks.has(id)) {
       const t = persistentTracks.get(id);
-      t.targetBbox = det.bbox;
+      t.targetBbox = targetBbox;
       t.class = det.class;
       t.conf = det.conf;
       t.lastSeen = now;
@@ -272,8 +283,8 @@ function updatePersistentTracks(newDetections) {
     } else {
       persistentTracks.set(id, {
         id: id,
-        bbox: [...det.bbox],
-        targetBbox: [...det.bbox],
+        bbox: [...targetBbox],
+        targetBbox: [...targetBbox],
         class: det.class,
         conf: det.conf,
         lastSeen: now,
@@ -304,54 +315,52 @@ async function detectCurrentFeedFrame() {
     // Capture the exact video frame currently displayed on the website
     captureCtx.drawImage(nativeHlsVideo, 0, 0, 640, 360);
 
-    captureCanvas.toBlob(async (blob) => {
-      if (!blob) {
-        isDetecting = false;
-        return;
+    const blob = await new Promise((resolve) => {
+      captureCanvas.toBlob(resolve, "image/jpeg", 0.70);
+    });
+
+    if (!blob) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", blob, "feed_frame.jpg");
+
+    const res = await fetch(`${API_BASE}/api/ml/detect`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const tracks = data.tracks || data.detections || [];
+      updatePersistentTracks(tracks);
+
+      if (hudStatsTelemetry) {
+        hudStatsTelemetry.textContent = `LATENCY: ${data.latency_ms}ms • ${data.fps} FPS (YOLOv8 FP16 BYTETRACK ON FEED)`;
       }
 
-      const formData = new FormData();
-      formData.append("file", blob, "feed_frame.jpg");
-
-      try {
-        const res = await fetch(`${API_BASE}/api/stream/detect_feed_frame`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.detections) {
-            updatePersistentTracks(data.detections);
-          }
-
-          if (hudStatsTelemetry) {
-            hudStatsTelemetry.textContent = `LATENCY: ${data.latency_ms}ms • ${data.fps} FPS (YOLOv8 FP16 BYTETRACK ON FEED)`;
-          }
-
-          if (hudDetectionCount && data.counts) {
-            const total = data.counts.person + data.counts.vehicle + data.counts.parcel;
-            hudDetectionCount.textContent = `DETECTED: ${data.counts.person} HUMANS, ${data.counts.vehicle} VEHICLES`;
-            if (streamStatusTag) {
-              streamStatusTag.textContent = `YOLO ON FEED: ${total} DETECTED`;
-            }
-          }
+      if (hudDetectionCount && data.counts) {
+        const total = data.counts.person + data.counts.vehicle + data.counts.parcel;
+        hudDetectionCount.textContent = `DETECTED: ${data.counts.person} HUMANS, ${data.counts.vehicle} VEHICLES`;
+        if (streamStatusTag) {
+          streamStatusTag.textContent = `YOLO ON FEED: ${total} DETECTED`;
         }
-      } catch (err) {
-        // network retry
-      } finally {
-        isDetecting = false;
       }
-    }, "image/jpeg", 0.65);
+    }
   } catch (err) {
+    console.warn("Feed detection error:", err);
+  } finally {
     isDetecting = false;
   }
 }
 
 function scheduleNextDetection() {
   if (streamEngine === "nvdec" && nativeHlsVideo && !nativeHlsVideo.paused && nativeHlsVideo.readyState >= 2) {
-    detectCurrentFeedFrame().finally(() => {
-      setTimeout(scheduleNextDetection, 35);
+    detectCurrentFeedFrame().then(() => {
+      setTimeout(scheduleNextDetection, 30);
+    }).catch(() => {
+      setTimeout(scheduleNextDetection, 50);
     });
   } else {
     setTimeout(scheduleNextDetection, 80);
@@ -417,6 +426,10 @@ function setupCameraSelector() {
         streamStatusTag.textContent = "YOLO LIVE: ACTIVE";
         hudFeedSource.textContent = "LIBERTY BELL // PHILADELPHIA (RTX 3050)";
       }
+
+      // Clear old camera detection tracks immediately to prevent visual ghosting
+      persistentTracks.clear();
+      if (ctx) ctx.clearRect(0, 0, cctvCanvas.width, cctvCanvas.height);
 
       // Notify Backend to Offload Old Channel & Onload New Channel
       try {
@@ -572,7 +585,7 @@ function startCctvRenderLoop() {
           color = "#FF4E00"; // Orange for parcels
         }
 
-        const label = `${t.class.toUpperCase()} ${Math.round(t.conf * 100)}%`;
+        const label = `${t.class.toUpperCase()} #${id} ${Math.round(t.conf * 100)}%`;
         drawTargetBox(ctx, x, y, w, h, label, color, false, t.alpha);
       }
     }
