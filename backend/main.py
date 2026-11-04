@@ -5,7 +5,10 @@ Serves CCTV endpoints, AI Reasoning Agent, Auth, and Minimalist Editorial Web Ap
 
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+import cv2
+import numpy as np
+import time
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -109,6 +112,73 @@ def get_live_stats():
 def get_live_tracks():
     """Returns real-time detection bounding boxes and telemetry for NVDEC canvas overlays."""
     return live_detector.get_stats()
+
+
+@app.post("/api/stream/detect_feed_frame")
+async def detect_feed_frame(file: UploadFile = File(...)):
+    """
+    Receives the exact video frame currently playing in the user's browser,
+    runs GPU YOLOv8 FP16 Tensor Core inference, and returns exact bounding boxes
+    synchronized to the website feed.
+    """
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if frame is None:
+        return {"detections": [], "counts": {}, "latency_ms": 0}
+
+    t0 = time.time()
+    results = live_detector.model.predict(
+        frame,
+        device=live_detector.device,
+        imgsz=480,
+        conf=0.28,
+        classes=live_detector.target_classes,
+        verbose=False,
+    )
+    latency = (time.time() - t0) * 1000
+
+    h_img, w_img = frame.shape[:2]
+    scale_x = 960.0 / w_img
+    scale_y = 540.0 / h_img
+
+    detections = []
+    boxes = results[0].boxes
+    p_count, v_count, item_count = 0, 0, 0
+
+    if boxes is not None:
+        for b in boxes:
+            cls_id = int(b.cls[0].item())
+            cls_name = live_detector.model.names[cls_id]
+            conf = float(b.conf[0].item())
+            raw_box = b.xyxy[0].tolist()
+
+            x1 = int(round(raw_box[0] * scale_x))
+            y1 = int(round(raw_box[1] * scale_y))
+            x2 = int(round(raw_box[2] * scale_x))
+            y2 = int(round(raw_box[3] * scale_y))
+
+            cls_lower = cls_name.lower()
+            if cls_lower == "person":
+                p_count += 1
+            elif cls_lower in ["car", "bus", "truck", "motorcycle"]:
+                v_count += 1
+            else:
+                item_count += 1
+
+            detections.append({
+                "bbox": [x1, y1, x2, y2],
+                "class": cls_lower,
+                "conf": round(conf, 2),
+            })
+
+    return {
+        "detections": detections,
+        "counts": {"person": p_count, "vehicle": v_count, "parcel": item_count},
+        "latency_ms": round(latency, 1),
+        "fps": round(1000.0 / max(latency, 1.0), 1),
+        "device": f"{live_detector.device_name} (FP16 Tensor Cores)",
+    }
 
 
 # Auth Endpoints

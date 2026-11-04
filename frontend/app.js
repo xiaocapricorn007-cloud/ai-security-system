@@ -245,37 +245,88 @@ function setupStreamEngineToggle() {
   });
 }
 
+let isDetecting = false;
+const captureCanvas = document.createElement("canvas");
+captureCanvas.width = 640;
+captureCanvas.height = 360;
+const captureCtx = captureCanvas.getContext("2d", { willReadFrequently: true });
+
+async function detectCurrentFeedFrame() {
+  if (isDetecting || streamEngine !== "nvdec" || !nativeHlsVideo) return;
+  if (nativeHlsVideo.paused || nativeHlsVideo.ended || nativeHlsVideo.readyState < 2) return;
+
+  isDetecting = true;
+  try {
+    // Capture the exact video frame currently displayed on the website
+    captureCtx.drawImage(nativeHlsVideo, 0, 0, 640, 360);
+
+    captureCanvas.toBlob(async (blob) => {
+      if (!blob) {
+        isDetecting = false;
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", blob, "feed_frame.jpg");
+
+      try {
+        const res = await fetch(`${API_BASE}/api/stream/detect_feed_frame`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.detections) {
+            activeDetections = data.detections;
+          }
+
+          if (hudStatsTelemetry) {
+            hudStatsTelemetry.textContent = `LATENCY: ${data.latency_ms}ms • ${data.fps} FPS (YOLOv8 FP16 ON WEBSITE FEED)`;
+          }
+
+          if (hudDetectionCount && data.counts) {
+            const total = data.counts.person + data.counts.vehicle + data.counts.parcel;
+            hudDetectionCount.textContent = `DETECTED: ${data.counts.person} HUMANS, ${data.counts.vehicle} VEHICLES`;
+            if (streamStatusTag) {
+              streamStatusTag.textContent = `YOLO ON FEED: ${total} DETECTED`;
+            }
+          }
+        }
+      } catch (err) {
+        // network retry
+      } finally {
+        isDetecting = false;
+      }
+    }, "image/jpeg", 0.65);
+  } catch (err) {
+    isDetecting = false;
+  }
+}
+
 function startStatsPolling() {
+  // 1. High-speed YOLO inference directly on the active website video feed
+  setInterval(detectCurrentFeedFrame, 75);
+
+  // 2. Secondary telemetry polling for composite mode
   async function poll() {
+    if (streamEngine !== "mjpeg") return;
     try {
-      const res = await fetch(`${API_BASE}/api/stream/live/tracks`);
+      const res = await fetch(`${API_BASE}/api/stream/live/stats`);
       if (res.ok) {
         const stats = await res.json();
-        if (stats.detections) {
-          activeDetections = stats.detections;
-        }
         if (hudStatsTelemetry) {
-          if (streamEngine === "nvdec") {
-            hudStatsTelemetry.textContent = `LATENCY: ${stats.latency_ms}ms • 60 FPS (NVDEC ACCEL + 2-4s BUFFER)`;
-          } else {
-            hudStatsTelemetry.textContent = `LATENCY: ${stats.latency_ms}ms • ${stats.fps} FPS (COMPOSITE MJPEG)`;
-          }
+          hudStatsTelemetry.textContent = `LATENCY: ${stats.latency_ms}ms • ${stats.fps} FPS (COMPOSITE MJPEG)`;
         }
         if (hudDetectionCount && stats.counts) {
           const total = stats.counts.person + stats.counts.vehicle + stats.counts.parcel;
           hudDetectionCount.textContent = `DETECTED: ${stats.counts.person} HUMANS, ${stats.counts.vehicle} VEHICLES`;
-          if (streamStatusTag) {
-            streamStatusTag.textContent = `YOLO LIVE: ${total} DETECTIONS`;
-          }
         }
       }
-    } catch (e) {
-      // server still initializing
-    }
+    } catch (e) {}
   }
 
-  setInterval(poll, 150);
-  poll();
+  setInterval(poll, 1000);
 }
 
 function startClock() {
