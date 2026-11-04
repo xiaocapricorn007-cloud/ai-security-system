@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/styles.css?v=15.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=16.0" />
 </head>
 <body class="bg-halfwhite text-obsidian no-scroll">
 
@@ -263,16 +263,18 @@
     <!-- ================= VIEW B: DEDICATED STREAM & ANALYTICS VIEW (SPLIT LAYOUT) ================= -->
     <main id="stream-view" class="stream-container hidden">
       
-      <!-- STREAM TOP BAR -->
+      <!-- STREAM TOP BAR (FIXED GRID POSITIONING) -->
       <div class="stream-top-bar">
-        <button id="btn-back-to-landing" class="btn-back-hub">
-          <span class="back-arrow">&larr;</span>
-          <span>Back to Sectors Overview</span>
-        </button>
+        <div class="stream-top-left">
+          <button id="btn-back-to-landing" class="btn-back-hub">
+            <span class="back-arrow">&larr;</span>
+            <span>Back to Sectors Overview</span>
+          </button>
 
-        <div class="stream-cam-meta">
-          <span class="cam-badge" id="stream-cam-id">CAM-01</span>
-          <h2 class="stream-cam-title" id="stream-cam-title">Times Square South & Broadway</h2>
+          <div class="stream-cam-meta">
+            <span class="cam-badge" id="stream-cam-id">CAM-01</span>
+            <h2 class="stream-cam-title" id="stream-cam-title">Times Square South & Broadway</h2>
+          </div>
         </div>
 
         <div class="channel-pills-stream" id="stream-channel-selector">
@@ -478,6 +480,6 @@
 
   <!-- HLS Player & Core Application Script -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="/static/app.js?v=15.0"></script>
+  <script src="/static/app.js?v=16.0"></script>
 </body>
 </html>

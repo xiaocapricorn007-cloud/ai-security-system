@@ -347,6 +347,11 @@ html, body {
   padding: 3px 9px;
   border-radius: 20px;
   border: 1px solid var(--border-subtle);
+  width: 165px;
+  min-width: 165px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .clock-label {
@@ -358,6 +363,7 @@ html, body {
 .clock-time {
   font-weight: 600;
   color: var(--text-obsidian);
+  font-variant-numeric: tabular-nums;
 }
 
 .user-chip {
@@ -1121,15 +1127,27 @@ html, body {
 }
 
 .stream-top-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
+  height: 46px;
+  min-height: 46px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 8px 14px;
+  padding: 0 14px;
   box-shadow: var(--shadow-subtle);
   flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.stream-top-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .btn-back-hub {
@@ -1145,6 +1163,8 @@ html, body {
   color: var(--text-obsidian);
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-back-hub:hover {
@@ -1157,6 +1177,9 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .cam-badge {
@@ -1167,41 +1190,56 @@ html, body {
   background: var(--bg-subtle);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
 .stream-cam-title {
   font-family: var(--font-editorial);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 400;
   color: var(--text-obsidian);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .channel-pills-stream {
   display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 5px;
+  justify-self: center;
+  flex-shrink: 0;
 }
 
 .stream-pill {
   background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 4px 8px;
+  padding: 4px 10px;
   font-size: 10px;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .stream-pill.active {
   background: var(--text-obsidian);
   color: #FFF;
   border-color: var(--text-obsidian);
+  font-weight: 600;
 }
 
 .stream-actions {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  justify-self: end;
+  flex-shrink: 0;
 }
 
 .badge-tag {
@@ -1212,6 +1250,9 @@ html, body {
   background: var(--bg-subtle);
   color: var(--text-muted);
   border: 1px solid var(--border-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .badge-interactive {
@@ -1226,11 +1267,35 @@ html, body {
   border-color: var(--text-obsidian);
 }
 
-.badge-orange {
-  background: var(--accent-orange-light);
-  color: var(--accent-orange);
+#stream-engine-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 190px;
+  min-width: 190px;
+  max-width: 190px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#stream-status-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 165px;
+  min-width: 165px;
+  max-width: 165px;
+  text-align: center;
   font-weight: 600;
   border-color: rgba(255, 78, 0, 0.2);
+  background: var(--accent-orange-light);
+  color: var(--accent-orange);
+  white-space: nowrap;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 /* ================= STREAM CONTENT SPLIT (LEFT VIDEO | RIGHT ANALYTICS & CHAT) ================= */
