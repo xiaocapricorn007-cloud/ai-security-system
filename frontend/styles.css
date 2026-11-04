@@ -439,6 +439,10 @@ body {
   border: none;
   z-index: 1;
   pointer-events: auto;
+  image-rendering: -webkit-optimize-contrast;
+  transform: translateZ(0);
+  will-change: contents;
+  backface-visibility: hidden;
 }
 
 .play-prompt-overlay {

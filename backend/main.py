@@ -20,7 +20,7 @@ from backend.auth import (
 )
 from backend.reasoning_agent import SecurityReasoningAgent
 from backend.earthcam_proxy import router as earthcam_router
-from backend.live_detector import live_detector
+from backend.live_detector import edge_ai_detector as live_detector
 import time
 
 app = FastAPI(
@@ -74,14 +74,16 @@ def on_startup():
 def stream_live_detection():
     """Streams real-time YOLO-annotated frames computed directly on GPU."""
     def frame_generator():
+        last_frame_bytes = None
         while True:
-            frame_bytes = live_detector.get_latest_jpeg()
-            if frame_bytes:
+            frame_bytes = live_detector.get_latest_annotated_jpeg()
+            if frame_bytes and frame_bytes != last_frame_bytes:
+                last_frame_bytes = frame_bytes
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
                 )
-            time.sleep(0.02)
+            time.sleep(0.015)
 
     return StreamingResponse(
         frame_generator(),
