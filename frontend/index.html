@@ -8,260 +8,352 @@
   <!-- Editorial Serif & Modern UI Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/styles.css?v=12.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=13.0" />
 </head>
 <body class="bg-halfwhite text-obsidian">
 
-  <!-- AUTHENTICATION MODAL OVERLAY -->
+  <!-- ================= 1. SMOOTH LOGIN SCREEN (WHITE & GREY EDITORIAL THEME) ================= -->
   <div id="auth-modal" class="auth-overlay">
     <div class="auth-card">
-      <div class="brand-monogram">SENTINEL <span class="highlight-orange">//</span> 01</div>
-      <h1 class="auth-title">Surveillance Intelligence</h1>
-      <p class="auth-subtitle">Restricted Security Console. Please identify yourself to decrypt surveillance feeds and query the AI agent.</p>
+      <div class="auth-brand-badge">
+        <span class="pulse-dot"></span>
+        <span>SENTINEL // SURVEILLANCE INTELLIGENCE</span>
+      </div>
       
-      <form id="login-form">
+      <h1 class="auth-title">Restricted Access Console</h1>
+      <p class="auth-subtitle">
+        Operator authentication required for decrypted CCTV access, real-time ByteTrack telemetry, and neural reasoning.
+      </p>
+
+      <form id="login-form" class="auth-form">
         <div class="form-group">
-          <label>Operator ID / Username</label>
-          <input type="text" id="login-username" value="admin" required autocomplete="username" />
+          <label for="login-username">Operator ID / Username</label>
+          <input 
+            type="text" 
+            id="login-username" 
+            value="admin" 
+            required 
+            autocomplete="username" 
+            placeholder="e.g. admin" 
+          />
         </div>
+        
         <div class="form-group">
-          <label>Security Passcode</label>
-          <input type="password" id="login-password" value="sentinel123" required autocomplete="current-password" />
+          <label for="login-password">Security Passcode</label>
+          <input 
+            type="password" 
+            id="login-password" 
+            value="sentinel123" 
+            required 
+            autocomplete="current-password" 
+            placeholder="••••••••••••" 
+          />
         </div>
+
         <div id="login-error" class="login-error hidden">Invalid credentials. Please re-enter.</div>
-        <button type="submit" class="btn-primary">
-          <span>Authenticate Session</span>
+
+        <button type="submit" class="btn-primary auth-submit-btn">
+          <span>Enter Command Center</span>
           <span class="arrow">&rarr;</span>
         </button>
       </form>
+
       <div class="auth-footer">
-        Default operator credentials: <code>admin</code> / <code>sentinel123</code>
+        <span class="auth-cred-chip" id="quick-fill-creds" title="Click to auto-fill operator credentials">
+          Operator Access: <code>admin</code> / <code>sentinel123</code>
+        </span>
       </div>
     </div>
   </div>
 
-  <!-- MAIN APP CONTAINER -->
+  <!-- ================= 2. MAIN APP SHELL ================= -->
   <div id="app" class="app-layout hidden">
     
     <!-- TOP NAVIGATION & STATUS BAR -->
     <header class="top-nav">
       <div class="nav-left">
-        <div class="logo">SENTINEL <span class="accent-orange">//</span> 01</div>
+        <div class="logo-group" id="nav-brand-logo" title="Back to Sectors Hub">
+          <span class="logo-title">SENTINEL</span>
+          <span class="logo-divider">//</span>
+          <span class="logo-sub">SURVEILLANCE INTELLIGENCE</span>
+        </div>
         <div class="status-indicator">
           <span class="pulse-dot"></span>
-          <span class="status-label">CCTV LIVE</span>
+          <span class="status-label">3 NODES ONLINE</span>
         </div>
-        <div class="hw-chip">RTX 3050 &bull; 58 FPS &bull; YOLOv8-CUDA</div>
-      </div>
-
-      <div class="nav-center">
-        <!-- Camera Channel Selector -->
-        <div class="channel-pills" id="camera-selector">
-          <button class="channel-pill active" data-cam="cam-01-times-square">
-            <span class="pill-dot"></span> Times Square (NYC)
-          </button>
-          <button class="channel-pill" data-cam="cam-02-abbey-road">
-            <span class="pill-dot"></span> Abbey Road (London)
-          </button>
-          <button class="channel-pill" data-cam="cam-03-liberty-bell">
-            <span class="pill-dot"></span> Liberty Bell (Philadelphia)
-          </button>
-        </div>
+        <div class="hw-chip">RTX 3050 &bull; FP16 TENSOR CORES &bull; BYTETRACK</div>
       </div>
 
       <div class="nav-right">
-        <div class="clock-display" id="system-clock">02:00:22 PM</div>
+        <div class="live-clock-pill">
+          <span class="clock-label">STATION TIME</span>
+          <span class="clock-time" id="system-clock-nav">02:00:22 PM</span>
+        </div>
         <div class="user-chip">
-          <span class="user-avatar">AD</span>
+          <span class="user-avatar">OP</span>
           <span class="user-name" id="user-display-name">Admin</span>
         </div>
         <button id="logout-btn" class="btn-text">Sign Out</button>
       </div>
     </header>
 
-    <!-- MAIN SURVEILLANCE & REASONING SECTION -->
-    <main class="dashboard-grid">
+    <!-- ================= VIEW A: LANDING PAGE (SECTORS & LIVE INSIGHTS) ================= -->
+    <main id="landing-view" class="landing-container">
       
-      <!-- LEFT COLUMN: VIDEO FEED & TIMELINE CONTROLS -->
-      <section class="feed-column">
+      <!-- UPPER SECTION: CAMERA CARDS + RIGHT SIDE (TIME & INSIGHTS) -->
+      <div class="landing-top-grid">
         
-        <div class="video-panel">
-          <div class="video-header">
-            <div class="cam-info">
-              <span class="cam-badge" id="current-cam-id">CAM-01</span>
-              <h2 class="cam-name" id="current-cam-title">Times Square South & Broadway</h2>
+        <!-- LEFT 2/3: CAMERA SECTOR CARDS -->
+        <section class="sectors-section">
+          <div class="section-header">
+            <div>
+              <span class="section-tag">SURVEILLANCE SECTORS</span>
+              <h2 class="section-title">Active Monitored Feeds</h2>
             </div>
-            <div class="stream-telemetry">
-              <button id="stream-engine-toggle" class="badge-tag badge-interactive" title="Click to toggle between NVDEC Hardware Video and Direct Composite MJPEG">
-                DECODE: NVDEC (2-4s BUFFER)
-              </button>
-              <span class="badge-tag badge-orange" id="stream-status-tag">YOLO LIVE: ACTIVE</span>
-            </div>
-          </div>
-
-          <!-- Video Canvas / Live EarthCam Stream -->
-          <div class="video-wrapper" id="video-wrapper">
-            <!-- Hardware-Accelerated NVDEC Native HLS Player (2-4s Jitter Buffer, Butter-Smooth 60 FPS) -->
-            <video 
-              id="native-hls-video" 
-              class="live-stream-player" 
-              autoplay 
-              muted 
-              playsinline
-              crossorigin="anonymous"
-            ></video>
-
-            <!-- Direct GPU-Annotated YOLO Composite MJPEG (Fallback / Zero-Buffer Mode) -->
-            <img 
-              id="live-ai-stream" 
-              class="live-stream-player hidden" 
-              src="" 
-              alt="Real-Time YOLO Surveillance Stream" 
-            />
-
-            <!-- Transparent AI HUD Overlay Canvas for Hardware NVDEC Mode -->
-            <canvas id="cctv-canvas" width="960" height="540"></canvas>
-            
-            <div class="cctv-overlay">
-              <div class="cctv-hud-top">
-                <span id="hud-feed-source">TIMES SQUARE &bull; YOLOv8 REAL-TIME (RTX 3050)</span>
-                <span id="hud-cam-time">02:00:22 PM</span>
-              </div>
-              <div class="cctv-hud-bottom">
-                <span id="hud-stats-telemetry">LATENCY: 8.5ms &bull; 60 FPS (NVDEC ACCEL)</span>
-                <span id="hud-detection-count">LIVE DETECTIONS: ACTIVE</span>
-              </div>
+            <div class="sectors-meta">
+              <span class="meta-badge">3 STREAMS CONNECTED</span>
+              <span class="meta-badge-orange">REAL-TIME INFERENCE</span>
             </div>
           </div>
 
-          <!-- Scrubbable Video Timeline with Event Markers -->
-          <div class="timeline-container">
-            <div class="timeline-header">
-              <div class="timeline-title">Surveillance Index Timeline</div>
-              <div class="timeline-playback-time" id="playback-time-label">02:00:22 PM (142s)</div>
-            </div>
-
-            <div class="timeline-track" id="timeline-track">
-              <!-- Event Tick Markers dynamically injected -->
-              <div class="timeline-progress" id="timeline-progress" style="width: 60%;"></div>
-              <div class="timeline-scrubber" id="timeline-scrubber" style="left: 60%;"></div>
-              
-              <div class="event-markers" id="event-markers">
-                <!-- Markers: Blue = person, Orange = parcel, Red = drone -->
-              </div>
-            </div>
-
-            <div class="timeline-axis">
-              <span>11:00 AM</span>
-              <span>12:00 PM</span>
-              <span>01:00 PM</span>
-              <span>02:00 PM</span>
-              <span>03:00 PM</span>
-            </div>
+          <div class="camera-cards-grid" id="camera-cards-grid">
+            <!-- Dynamic camera cards loaded via JavaScript -->
           </div>
-        </div>
+        </section>
 
-        <!-- RECENT INCIDENT LOGS -->
-        <div class="incidents-panel">
-          <div class="panel-header">
-            <h3 class="editorial-title">Surveillance Incident Log</h3>
-            <div class="filter-tabs">
-              <button class="filter-tab active" data-filter="all">All Events</button>
-              <button class="filter-tab" data-filter="parcel">Parcels</button>
-              <button class="filter-tab" data-filter="drone">Drone Alerts</button>
-              <button class="filter-tab" data-filter="person">Humans</button>
-            </div>
-          </div>
-
-          <div class="incident-table-wrapper">
-            <table class="incident-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Camera</th>
-                  <th>Entity</th>
-                  <th>Confidence</th>
-                  <th>Incident Description</th>
-                  <th>Proof</th>
-                </tr>
-              </thead>
-              <tbody id="incidents-tbody">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </section>
-
-      <!-- RIGHT COLUMN: AI REASONING ASSISTANT -->
-      <aside class="reasoning-column">
-        <div class="agent-panel">
+        <!-- RIGHT 1/3: TIME RIGHT NOW + INSIGHTS UNDERNEATH -->
+        <aside class="landing-right-panel">
           
-          <div class="agent-header">
-            <div class="agent-badge">
-              <span class="sparkle-icon">&#10022;</span> AI Reasoning Agent
+          <!-- Big Chronometer Card -->
+          <div class="panel-card time-card">
+            <div class="card-tag">SYSTEM CHRONOMETER</div>
+            <div class="big-time-display" id="landing-clock-big">
+              06:58:12 <span class="ampm">PM</span>
             </div>
-            <h2 class="agent-headline">Footage Analysis & Query</h2>
-            <p class="agent-desc">Ask natural questions. The agent inspects camera footage, verifies object timestamps, and links proof clips.</p>
+            <div class="time-date" id="landing-date-display">Wednesday, November 4, 2026</div>
+            <div class="time-meta">Security Command Station &bull; IST (UTC+5:30) &bull; Synchronized</div>
           </div>
 
-          <!-- Suggested Quick Queries -->
-          <div class="suggested-queries">
-            <span class="suggest-label">Try asking:</span>
-            <button class="suggest-chip" data-query="Did someone drop a parcel at 2:00 pm?">
-              &ldquo;Did someone drop a parcel at 2:00 pm?&rdquo;
+          <!-- Live Surveillance Insights Card Underneath -->
+          <div class="panel-card insights-card">
+            <div class="card-header-flex">
+              <div>
+                <div class="card-tag">AUTOMATED INTELLIGENCE</div>
+                <h3 class="card-title">Surveillance Insights</h3>
+              </div>
+              <div class="threat-pill">
+                <span class="threat-dot"></span>
+                <span>NORMAL // LVL 1</span>
+              </div>
+            </div>
+
+            <!-- Total Entity Counters Breakdown -->
+            <div class="insights-entity-stats">
+              <div class="stat-pill">
+                <span class="stat-num" id="insight-total-persons">28</span>
+                <span class="stat-lbl">Humans Monitored</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-num" id="insight-total-vehicles">14</span>
+                <span class="stat-lbl">Vehicles Monitored</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-num" id="insight-total-parcels">3</span>
+                <span class="stat-lbl">Parcels / Items</span>
+              </div>
+            </div>
+
+            <!-- Live Sector Observations List -->
+            <div class="insights-digest-list">
+              <div class="insight-bullet">
+                <span class="bullet-tag">TIMES SQUARE</span>
+                <p>Pedestrian surge concentrated at Broadway crosswalk; ByteTrack maintaining continuous spatial tracking on foot traffic.</p>
+              </div>
+              <div class="insight-bullet">
+                <span class="bullet-tag">ABBEY ROAD</span>
+                <p>Zebra crossing transit tempo steady; vehicular deceleration observed within expected safety margins.</p>
+              </div>
+              <div class="insight-bullet">
+                <span class="bullet-tag">LIBERTY BELL</span>
+                <p>Independence Hall perimeter secure; tourist groups moving along south colonnade without perimeter breach.</p>
+              </div>
+            </div>
+
+            <div class="insights-footer">
+              <span class="hw-indicator">EDGE AI: RTX 3050 &bull; 24.2ms INFERENCE &bull; 0s DROPPED</span>
+            </div>
+          </div>
+
+        </aside>
+
+      </div>
+
+      <!-- LOWER SECTION: BOTTOM-LEFT PAST ALERTS + BOTTOM-RIGHT CHAT BAR -->
+      <div class="landing-bottom-grid">
+        
+        <!-- BOTTOM-LEFT: MESSAGES AND ALERTS FROM THE PAST -->
+        <section class="past-alerts-section">
+          <div class="section-header-compact">
+            <div class="flex-align">
+              <span class="section-tag">LOG ARCHIVE</span>
+              <h3 class="compact-title">Messages & Past Alerts</h3>
+            </div>
+            <div class="filter-tabs-compact">
+              <button class="alert-tab active" data-filter="all">All</button>
+              <button class="alert-tab" data-filter="parcel">Parcels</button>
+              <button class="alert-tab" data-filter="person">Humans</button>
+              <button class="alert-tab" data-filter="vehicle">Vehicles</button>
+            </div>
+          </div>
+
+          <div class="past-alerts-scroll" id="past-alerts-list">
+            <!-- Dynamic alerts populated via JavaScript -->
+          </div>
+        </section>
+
+        <!-- BOTTOM-RIGHT: INTERACTIVE CHAT BAR FOR ASKING INSIGHTS -->
+        <section class="chat-insights-section">
+          <div class="section-header-compact">
+            <span class="section-tag">NEURAL REASONING AGENT</span>
+            <h3 class="compact-title">Surveillance Intelligence Query</h3>
+          </div>
+
+          <div class="chat-chips-row">
+            <span class="chips-label">Quick Insights:</span>
+            <button class="chat-suggest-chip" data-query="Where are the highest pedestrian counts right now?">
+              &ldquo;Highest pedestrian counts?&rdquo;
             </button>
-            <button class="suggest-chip" data-query="Was there any unauthorized drone spotted?">
-              &ldquo;Was there any unauthorized drone spotted?&rdquo;
+            <button class="chat-suggest-chip" data-query="Did someone drop an unattended parcel today?">
+              &ldquo;Any unattended parcels?&rdquo;
             </button>
-            <button class="suggest-chip" data-query="Show me all visitors at the front entrance">
-              &ldquo;Show me all visitors at the front entrance&rdquo;
+            <button class="chat-suggest-chip" data-query="Cross-reference vehicle alerts between Abbey Road and Times Square">
+              &ldquo;Cross-reference vehicle transit&rdquo;
             </button>
           </div>
 
-          <!-- Query Input -->
-          <form id="agent-query-form" class="agent-input-form">
-            <div class="input-wrapper">
+          <!-- Chat Input Form -->
+          <form id="landing-chat-form" class="landing-chat-form">
+            <div class="chat-input-wrapper">
               <input 
                 type="text" 
-                id="agent-query-input" 
-                placeholder="Ask e.g. Did someone drop a parcel at 2:00 pm?..." 
+                id="landing-chat-input" 
+                placeholder="Ask for surveillance insights across feeds (e.g. 'Summarize pedestrian flow', 'Check for security alerts')..." 
                 required 
               />
-              <button type="submit" class="btn-ask" id="btn-ask-submit">
-                <span>Analyze</span>
+              <button type="submit" class="btn-chat-submit" id="landing-chat-submit">
+                <span>Ask Agent</span>
                 <span class="arrow">&rarr;</span>
               </button>
             </div>
           </form>
 
-          <!-- Agent Response Card -->
-          <div class="agent-response-area" id="agent-response-area">
-            
-            <div class="welcome-card" id="welcome-card">
-              <div class="welcome-icon">&#128065;</div>
-              <h4 class="welcome-title">Ready to Reason Across Surveillance</h4>
-              <p>Type a question or click any prompt above to cross-reference multi-object events across time and cameras.</p>
-            </div>
+          <!-- Expandable Reasoning Result Card -->
+          <div id="landing-chat-result" class="chat-result-card hidden">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
 
-            <!-- Dynamic Answer Card injected here -->
-            <div id="agent-result-card" class="result-card hidden">
-              <!-- Rendered by app.js -->
-            </div>
+      </div>
 
+    </main>
+
+
+    <!-- ================= VIEW B: DEDICATED STREAM & ML MODEL VIEW ================= -->
+    <main id="stream-view" class="stream-container hidden">
+      
+      <div class="stream-top-bar">
+        <button id="btn-back-to-landing" class="btn-back-hub">
+          <span class="back-arrow">&larr;</span>
+          <span>Back to Sectors Overview</span>
+        </button>
+
+        <div class="stream-cam-meta">
+          <span class="cam-badge" id="stream-cam-id">CAM-01</span>
+          <h2 class="stream-cam-title" id="stream-cam-title">Times Square South & Broadway</h2>
+        </div>
+
+        <div class="channel-pills-stream" id="stream-channel-selector">
+          <button class="stream-pill active" data-cam="cam-01-times-square">Times Square</button>
+          <button class="stream-pill" data-cam="cam-02-abbey-road">Abbey Road</button>
+          <button class="stream-pill" data-cam="cam-03-liberty-bell">Liberty Bell</button>
+        </div>
+
+        <div class="stream-actions">
+          <button id="stream-engine-toggle" class="badge-tag badge-interactive" title="Toggle Hardware NVDEC">
+            DECODE: NVDEC (2-4s BUFFER)
+          </button>
+          <span class="badge-tag badge-orange" id="stream-status-tag">YOLO ON FEED: ACTIVE</span>
+        </div>
+      </div>
+
+      <!-- Main Video Panel with Canvas Overlay -->
+      <div class="stream-main-card">
+        <div class="video-wrapper" id="video-wrapper">
+          <!-- Native Hardware HLS Video Player -->
+          <video 
+            id="native-hls-video" 
+            class="live-stream-player" 
+            autoplay 
+            muted 
+            playsinline
+            crossorigin="anonymous"
+          ></video>
+
+          <!-- Fallback Image Stream -->
+          <img 
+            id="live-ai-stream" 
+            class="live-stream-player hidden" 
+            src="" 
+            alt="Real-Time Surveillance Stream" 
+          />
+
+          <!-- Bounding Box Canvas -->
+          <canvas id="cctv-canvas" width="960" height="540"></canvas>
+
+          <!-- CCTV HUD Overlays -->
+          <div class="cctv-overlay">
+            <div class="cctv-hud-top">
+              <span id="hud-feed-source">TIMES SQUARE // YOLOv8 REAL-TIME (RTX 3050)</span>
+              <span id="hud-cam-time">02:00:22 PM</span>
+            </div>
+            <div class="cctv-hud-bottom">
+              <span id="hud-stats-telemetry">LATENCY: 24.2ms &bull; 60 FPS (NVDEC ACCEL)</span>
+              <span id="hud-detection-count">LIVE DETECTIONS: ACTIVE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Video Timeline with Event Markers -->
+        <div class="timeline-container">
+          <div class="timeline-header">
+            <div class="timeline-title">Surveillance Index Timeline</div>
+            <div class="timeline-playback-time" id="playback-time-label">02:00:22 PM (142s)</div>
           </div>
 
+          <div class="timeline-track" id="timeline-track">
+            <div class="timeline-progress" id="timeline-progress" style="width: 60%;"></div>
+            <div class="timeline-scrubber" id="timeline-scrubber" style="left: 60%;"></div>
+            <div class="event-markers" id="event-markers"></div>
+          </div>
+
+          <div class="timeline-axis">
+            <span>11:00 AM</span>
+            <span>12:00 PM</span>
+            <span>01:00 PM</span>
+            <span>02:00 PM</span>
+            <span>03:00 PM</span>
+          </div>
         </div>
-      </aside>
+      </div>
 
     </main>
 
   </div>
 
+  <!-- HLS Player & Core Application Script -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="/static/app.js?v=12.0"></script>
+  <script src="/static/app.js?v=13.0"></script>
 </body>
 </html>
